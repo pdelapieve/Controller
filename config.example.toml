@@ -1,0 +1,58 @@
+# Copie este arquivo para config.toml e ajuste os valores.
+
+[microsoft]
+# Application (client) ID e Directory (tenant) ID do app registrado no
+# Microsoft Entra ID (veja o README, seção "Registro do app").
+client_id = "00000000-0000-0000-0000-000000000000"
+tenant_id = "00000000-0000-0000-0000-000000000000"
+
+[email]
+# Nome da pasta do Outlook que recebe as publicações.
+pasta = "Publicações"
+# Quantos dias para trás buscar e-mails na primeira execução.
+dias_retroativos = 3
+# Remetentes considerados (vazio = todos os e-mails da pasta).
+remetentes = ["webjur@webjur.com.br", "no-reply@mail.legalone.com.br", "controladoria@charneski.com.br"]
+# Categoria aplicada ao e-mail no Outlook após o processamento
+# (evita reprocessar). Deixe "" para não marcar.
+categoria_processado = "Prazo agendado (app)"
+
+[planilha]
+# Planilha de programação no SharePoint.
+host = "charneskiadvogados.sharepoint.com"
+site = "/sites/CharneskiAdvogados_Drive2"
+arquivo = "JOBS/Programação 2026.xlsx"
+# Abas no formato "W41 13102026" (W<n> + data da semana em DDMMAAAA).
+
+[prazos]
+# Uma UF para os feriados estaduais (ex.: "RS"). Use "" para só nacionais.
+uf = "RS"
+# Prazo LO (interno do executor) = fatal menos N dias úteis.
+antecedencia_lo = 3
+# Revisão = fatal menos N dias úteis.
+antecedencia_revisao = 1
+# Datas extras sem expediente forense (AAAA-MM-DD), ex.: pontos facultativos.
+feriados_extras = ["2026-10-28"]
+
+[agenda]
+# Quais datas viram compromisso no Outlook: "lo", "revisao", "fatal".
+eventos = ["lo", "fatal"]
+# Convidar executor e revisor (envia convite por e-mail a eles).
+convidar_equipe = false
+# Lembrete (minutos antes do início do dia do compromisso).
+lembrete_minutos = 1080
+categoria = "Prazos"
+
+[ia]
+# Se ANTHROPIC_API_KEY estiver definida, o Claude identifica os prazos.
+# Sem chave, usa um extrator por expressões regulares (mais limitado).
+modelo = "claude-opus-5-5"
+
+# Equipe: nome como aparece na planilha -> e-mail.
+[equipe]
+Pedro = "pedro@charneski.com.br"
+Heron = "heron@charneski.com.br"
+Tiago = "tiago@charneski.com.br"
+Lorenzo = "lorenzo@charneski.com.br"
+Danieli = ""
+Arthur = ""

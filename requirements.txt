@@ -1,0 +1,4 @@
+anthropic>=1.0
+msal>=1.28
+requests>=2.31
+holidays>=0.50
