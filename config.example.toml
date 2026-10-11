@@ -6,16 +6,20 @@
 client_id = "00000000-0000-0000-0000-000000000000"
 tenant_id = "00000000-0000-0000-0000-000000000000"
 
-[email]
-# Nome da pasta do Outlook que recebe as publicações.
-pasta = "Publicações"
-# Quantos dias para trás buscar e-mails na primeira execução.
-dias_retroativos = 3
-# Remetentes considerados (vazio = todos os e-mails da pasta).
-remetentes = ["webjur@webjur.com.br", "no-reply@mail.legalone.com.br", "controladoria@charneski.com.br"]
-# Categoria aplicada ao e-mail no Outlook após o processamento
-# (evita reprocessar). Deixe "" para não marcar.
-categoria_processado = "Prazo agendado (app)"
+[legalone]
+# Pasta onde a rotina "Prazos do Mês no L.O." salva a planilha.
+pasta = 'C:\Users\Betina\Downloads'
+padrao = "Tarefas_Pendentes_LegalOne_*.xlsx"
+# A conclusão da tarefa do revisor no L.O. é o D-2 do fatal.
+d_menos = 2
+# Prazos com fatal vencido há mais de N dias não são mostrados (use --todas).
+ignorar_vencidas_ha_dias = 7
+
+[atribuicoes]
+# Planilha diária Atribuicoes_AAAA-MM-DD.xlsx (base para os andamentos no L.O.).
+pasta = 'C:\Users\Betina\Downloads'
+# Texto do andamento. Campos: {providencia} {executor} {lo} {revisor} {revisao} {fatal} {cliente} {processo}
+modelo_texto = "Atribuição de prazo – {providencia}. Executor: {executor} (Prazo LO {lo}). Revisor: {revisor} (revisão {revisao}). Prazo fatal: {fatal}."
 
 [planilha]
 # Planilha de programação no SharePoint.
@@ -27,7 +31,8 @@ arquivo = "JOBS/Programação 2026.xlsx"
 [prazos]
 # Uma UF para os feriados estaduais (ex.: "RS"). Use "" para só nacionais.
 uf = "RS"
-# Prazo LO (interno do executor) = fatal menos N dias úteis.
+# Usadas só quando falta a tarefa correspondente no L.O.:
+# Prazo LO (executor) = fatal menos N dias úteis.
 antecedencia_lo = 3
 # Revisão = fatal menos N dias úteis.
 antecedencia_revisao = 1
@@ -42,11 +47,6 @@ convidar_equipe = false
 # Lembrete (minutos antes do início do dia do compromisso).
 lembrete_minutos = 1080
 categoria = "Prazos"
-
-[ia]
-# Se ANTHROPIC_API_KEY estiver definida, o Claude identifica os prazos.
-# Sem chave, usa um extrator por expressões regulares (mais limitado).
-modelo = "claude-opus-5-5"
 
 # Equipe: nome como aparece na planilha -> e-mail.
 [equipe]

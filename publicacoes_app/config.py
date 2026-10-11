@@ -12,10 +12,12 @@ from pathlib import Path
 class Config:
     client_id: str
     tenant_id: str
-    pasta: str = "Publicações"
-    dias_retroativos: int = 3
-    remetentes: list[str] = field(default_factory=list)
-    categoria_processado: str = ""
+    lo_pasta: str = r"C:\Users\Betina\Downloads"
+    lo_padrao: str = "Tarefas_Pendentes_LegalOne_*.xlsx"
+    d_menos: int = 2
+    ignorar_vencidas_ha_dias: int = 7
+    atrib_pasta: str = r"C:\Users\Betina\Downloads"
+    atrib_modelo: str = ""
     sp_host: str = ""
     sp_site: str = ""
     sp_arquivo: str = ""
@@ -27,7 +29,6 @@ class Config:
     convidar_equipe: bool = False
     lembrete_minutos: int = 1080
     categoria_agenda: str = "Prazos"
-    modelo: str = "claude-opus-5-5"
     equipe: dict[str, str] = field(default_factory=dict)
     base_dir: Path = Path(".")
 
@@ -46,11 +47,11 @@ def carregar(caminho: str | Path) -> Config:
         raw = tomllib.load(f)
 
     ms = raw.get("microsoft", {})
-    em = raw.get("email", {})
+    lo = raw.get("legalone", {})
+    at = raw.get("atribuicoes", {})
     pl = raw.get("planilha", {})
     pz = raw.get("prazos", {})
     ag = raw.get("agenda", {})
-    ia = raw.get("ia", {})
 
     eventos = [e.lower() for e in ag.get("eventos", ["lo", "fatal"])]
     invalidos = set(eventos) - {"lo", "revisao", "fatal"}
@@ -60,10 +61,12 @@ def carregar(caminho: str | Path) -> Config:
     return Config(
         client_id=ms["client_id"],
         tenant_id=ms["tenant_id"],
-        pasta=em.get("pasta", "Publicações"),
-        dias_retroativos=int(em.get("dias_retroativos", 3)),
-        remetentes=[r.lower() for r in em.get("remetentes", [])],
-        categoria_processado=em.get("categoria_processado", ""),
+        lo_pasta=lo.get("pasta", Config.lo_pasta),
+        lo_padrao=lo.get("padrao", Config.lo_padrao),
+        d_menos=int(lo.get("d_menos", 2)),
+        ignorar_vencidas_ha_dias=int(lo.get("ignorar_vencidas_ha_dias", 7)),
+        atrib_pasta=at.get("pasta", lo.get("pasta", Config.atrib_pasta)),
+        atrib_modelo=at.get("modelo_texto", ""),
         sp_host=pl["host"],
         sp_site=pl["site"],
         sp_arquivo=pl["arquivo"],
@@ -75,7 +78,6 @@ def carregar(caminho: str | Path) -> Config:
         convidar_equipe=bool(ag.get("convidar_equipe", False)),
         lembrete_minutos=int(ag.get("lembrete_minutos", 1080)),
         categoria_agenda=ag.get("categoria", "Prazos"),
-        modelo=ia.get("modelo", "claude-opus-5-5"),
         equipe=dict(raw.get("equipe", {})),
         base_dir=caminho.resolve().parent,
     )

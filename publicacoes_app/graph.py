@@ -12,7 +12,6 @@ import requests
 
 GRAPH = "https://graph.microsoft.com/v1.0"
 ESCOPOS = [
-    "Mail.ReadWrite",
     "Calendars.ReadWrite",
     "Files.ReadWrite.All",
     "Sites.ReadWrite.All",

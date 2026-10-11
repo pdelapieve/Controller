@@ -13,13 +13,13 @@ FUSO = "E. South America Standard Time"  # Brasília (Windows time zone id)
 ROTULOS = {"lo": "Prazo LO", "revisao": "Revisão", "fatal": "FATAL"}
 
 
-def corpo_evento(tarefa: Tarefa, processo: str | None, ato: str, link_email: str) -> str:
+def corpo_evento(tarefa: Tarefa, processo: str | None, origem: str) -> str:
     linhas = [
         ("Cliente", tarefa.cliente),
         ("Caso", tarefa.caso),
         ("Processo", processo or ""),
         ("Providência", tarefa.providencia),
-        ("Publicação", ato),
+        ("Origem", origem),
         ("Executor", tarefa.executor),
         ("Revisor", tarefa.revisor),
         ("Prazo LO", f"{tarefa.lo:%d/%m/%Y}" if tarefa.lo else "sine die"),
@@ -28,8 +28,6 @@ def corpo_evento(tarefa: Tarefa, processo: str | None, ato: str, link_email: str
         ("Observações", tarefa.observacoes),
     ]
     itens = "".join(f"<b>{html.escape(k)}:</b> {html.escape(v)}<br>" for k, v in linhas if v)
-    if link_email:
-        itens += f'<br><a href="{html.escape(link_email)}">Abrir e-mail da publicação</a>'
     return itens
 
 
@@ -37,8 +35,7 @@ def criar_eventos(
     g: Graph,
     tarefa: Tarefa,
     processo: str | None,
-    ato: str,
-    link_email: str,
+    origem: str,
     tipos: list[str],
     convidados: list[str],
     lembrete_minutos: int,
@@ -46,7 +43,7 @@ def criar_eventos(
 ) -> list[str]:
     """Cria um compromisso de dia inteiro para cada tipo de data. Retorna os links."""
     datas = {"lo": tarefa.lo, "revisao": tarefa.revisao, "fatal": tarefa.fatal}
-    corpo = corpo_evento(tarefa, processo, ato, link_email)
+    corpo = corpo_evento(tarefa, processo, origem)
     links = []
     criados: set[date] = set()
     for tipo in tipos:

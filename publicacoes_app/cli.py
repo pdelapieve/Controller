@@ -1,21 +1,22 @@
-"""Fluxo interativo: e-mails de publicações -> prazo -> Outlook + planilha."""
+"""Fluxo interativo: tarefas do L.O. -> executor/revisor -> Outlook + Programação + atribuições."""
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import textwrap
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
+from . import atribuicoes
 from . import config as cfgmod
 from .agenda import criar_eventos
-from .email_outlook import Email, janela_inicial, listar, localizar_pasta, marcar_processado
-from .extrator import ExtratorRegex, PrazoIdentificado, criar_extrator
 from .graph import Graph
+from .legalone import Demanda, agrupar, ler_tarefas, localizar_arquivo
 from .planilha import Planilha, Tarefa, data_da_aba, escolher_aba
-from .prazos import calcular_fatal, calendario_para, datas_internas
+from .prazos import CalendarioForense, calendario_para, datas_internas
 
 PRIORIDADES = ("Alta", "Média", "Baixa", "Acompanhamento")
 
@@ -69,80 +70,72 @@ def sim(texto: str, padrao: bool = True) -> bool:
 # ---------------------------------------------------------------- estado
 
 class Estado:
+    """IDs de tarefas do L.O. já tratadas (atribuídas ou ignoradas)."""
+
     def __init__(self, caminho: Path):
         self.caminho = caminho
         self.dados = json.loads(caminho.read_text()) if caminho.exists() else {}
-        self.dados.setdefault("processados", {})
+        self.dados.setdefault("tarefas_lo", {})
 
-    def processado(self, email_id: str) -> bool:
-        return email_id in self.dados["processados"]
+    def tratada(self, d: Demanda) -> bool:
+        return all(i in self.dados["tarefas_lo"] for i in d.ids)
 
-    def marcar(self, email_id: str, resumo: str) -> None:
-        self.dados["processados"][email_id] = {"em": datetime.now().isoformat(timespec="seconds"), "resumo": resumo}
+    def marcar(self, d: Demanda, acao: str) -> None:
+        agora = datetime.now().isoformat(timespec="seconds")
+        for i in d.ids:
+            self.dados["tarefas_lo"][i] = {"em": agora, "acao": acao, "processo": d.principal.processo or ""}
         self.caminho.write_text(json.dumps(self.dados, ensure_ascii=False, indent=1))
 
 
 # ---------------------------------------------------------------- fluxo
 
-def sugerir_fatal(p: PrazoIdentificado, cfg) -> tuple[date | None, list[str]]:
-    avisos = list(p.avisos)
-    if p.fatal_informado:
-        return p.fatal_informado, avisos
-    if not (p.prazo_dias and p.data_marco):
-        avisos.append("Não foi possível calcular o fatal automaticamente.")
-        return None, avisos
-    cal = calendario_para(p.processo, cfg.uf, cfg.feriados_extras)
-    fatal = calcular_fatal(cal, p.marco, p.data_marco, p.prazo_dias, p.uteis)
-    if p.prazo_inferido:
-        avisos.append(f"Prazo de {p.prazo_dias} dias deduzido (não constava do texto) - confira.")
-    return fatal, avisos
+def _d(x: date | None) -> str:
+    return f"{x:%d/%m/%Y}" if x else "-"
 
 
-def mostrar_prazo(n: int, total: int, p: PrazoIdentificado, fatal: date | None, avisos: list[str]) -> None:
-    print(f"\n  ── Prazo {n}/{total} " + "─" * 50)
-    marco = {"inicio_contagem": "início da contagem", "publicacao": "publicação",
-             "disponibilizacao": "disponibilização", "intimacao": "intimação"}[p.marco]
+def mostrar_demanda(n: int, total: int, d: Demanda, ja_consta: bool) -> None:
+    p = d.principal
+    print(f"\n── {n}/{total} " + "─" * 66)
     campos = [
-        ("Processo", p.processo or "(não identificado)"),
-        ("Órgão", p.orgao),
-        ("Partes", p.partes),
-        ("Publicação", p.ato),
-        ("Providência", p.providencia),
-        ("Prazo", f"{p.prazo_dias} dias {'úteis' if p.uteis else 'corridos'}" if p.prazo_dias else "?"),
-        ("Marco", f"{marco} em {p.data_marco:%d/%m/%Y}" if p.data_marco else "?"),
-        ("Fatal (sugerido)", f"{fatal:%d/%m/%Y} ({['seg','ter','qua','qui','sex','sáb','dom'][fatal.weekday()]})" if fatal else "?"),
-        ("Observação", p.observacao),
+        ("Cliente", p.cliente),
+        ("Processo", p.processo or ""),
+        ("Pasta L.O.", p.pasta),
+        ("Tarefa", p.descricao),
+        ("Tipo", p.tipo),
     ]
+    if d.executor:
+        campos.append(("Tarefa executor", f"{_d(d.executor.vencimento)} - resp. atual: {d.executor.responsavel or '-'} (ID {d.executor.id})"))
+    if d.revisor:
+        campos.append(("Tarefa revisor", f"{_d(d.revisor.vencimento)} - resp. atual: {d.revisor.responsavel or '-'} (ID {d.revisor.id})"))
+    campos.append(("Fatal (D+2)", f"{_d(d.fatal)} ({['seg','ter','qua','qui','sex','sáb','dom'][d.fatal.weekday()]})"))
     for k, v in campos:
         if v:
-            print(textwrap.fill(v, 100, initial_indent=f"  {k:<17}", subsequent_indent=" " * 19))
-    for a in avisos:
+            print(textwrap.fill(str(v), 100, initial_indent=f"  {k:<16}", subsequent_indent=" " * 18))
+    for a in d.avisos:
         print(f"  ⚠ {a}")
+    if ja_consta:
+        print("  ⚠ Este processo já está na aba da semana com o mesmo fatal.")
 
 
-def montar_tarefa(p: PrazoIdentificado, fatal: date | None, cfg, existente: dict | None) -> Tarefa | None:
+def montar_tarefa(d: Demanda, cfg, cal: CalendarioForense, existente: dict | None) -> Tarefa | None:
     equipe = list(cfg.equipe)
     print()
     executor = escolher_pessoa("Executor", equipe)
     revisor = escolher_pessoa("Revisor", equipe, opcional=True)
 
-    cal = calendario_para(p.processo, cfg.uf, cfg.feriados_extras)
-    fatal = perguntar_data("Fatal", fatal)
-    if fatal:
-        sug = datas_internas(cal, fatal, cfg.antecedencia_lo, cfg.antecedencia_revisao, hoje())
-        lo_padrao, rev_padrao = sug.lo, (sug.revisao if revisor else None)
-    else:
-        lo_padrao = rev_padrao = None
-    lo = perguntar_data("Prazo LO (executor)", lo_padrao)
-    revisao = perguntar_data("Revisão", rev_padrao) if revisor else None
+    fatal = perguntar_data("Fatal", d.fatal)
+    sug = datas_internas(cal, fatal, cfg.antecedencia_lo, cfg.antecedencia_revisao, hoje()) if fatal else None
+    lo = perguntar_data("Prazo LO (executor)", d.lo or (sug.lo if sug else None))
+    revisao = perguntar_data("Revisão", d.revisao or (sug.revisao if sug else None)) if revisor else None
 
+    p = d.principal
     existente = existente or {}
     if existente:
-        print(f"  (Processo já consta na planilha: {existente.get('Cliente')} / {existente.get('Caso')})")
+        print(f"  (Processo já consta na Programação: {existente.get('Cliente')} / {existente.get('Caso')})")
     cliente = perguntar("Cliente", existente.get("Cliente") or p.cliente)
     natureza = perguntar("Natureza", existente.get("Natureza") or "Contencioso")
-    caso = perguntar("Caso", existente.get("Caso") or (p.processo or ""))
-    providencia = perguntar("Providência", p.providencia)
+    caso = perguntar("Caso", existente.get("Caso") or (p.processo or p.pasta))
+    providencia = perguntar("Providência", (d.executor or p).descricao[:150])
     prioridade = perguntar(f"Prioridade ({'/'.join(PRIORIDADES)})", "Alta")
     observacoes = perguntar("Observações", "")
 
@@ -151,64 +144,77 @@ def montar_tarefa(p: PrazoIdentificado, fatal: date | None, cfg, existente: dict
     print("\n  Resumo: " + " | ".join(
         f"{k}: {v:%d/%m/%Y}" if isinstance(v, date) else f"{k}: {v}"
         for k, v in tarefa.valores().items() if v))
-    return tarefa if sim("  Confirmar agendamento?") else None
+    return tarefa if sim("  Confirmar?") else None
 
 
-def processar_email(email: Email, extrator, cfg, g: Graph | None, plan: Planilha | None, aba: str,
-                    abas_busca: list[str], simular: bool) -> bool:
-    """Retorna True se o e-mail foi totalmente tratado (pode ser marcado como processado)."""
-    print("\n" + "═" * 78)
-    print(f"{email.recebido.astimezone():%d/%m/%Y %H:%M}  {email.remetente}")
-    print(f"Assunto: {email.assunto}")
-    try:
-        prazos = extrator.extrair(email.assunto, email.texto, email.recebido)
-    except Exception as e:  # falha da IA não deve interromper a fila
-        print(f"  ⚠ Falha na identificação com IA ({e}); usando extrator simples.")
-        prazos = ExtratorRegex().extrair(email.assunto, email.texto, email.recebido)
+def registrar_atribuicao(caminho: str, d: Demanda, t: Tarefa, modelo: str) -> None:
+    a = atribuicoes.Atribuicao(
+        cliente=t.cliente,
+        processo=d.principal.processo or "",
+        pasta=d.principal.pasta,
+        providencia=t.providencia,
+        executor=t.executor,
+        lo=t.lo,
+        revisor=t.revisor,
+        revisao=t.revisao,
+        fatal=t.fatal,
+        id_executor=d.executor.id if d.executor else "",
+        responsavel_executor=d.executor.responsavel if d.executor else "",
+        id_revisor=d.revisor.id if d.revisor else "",
+        responsavel_revisor=d.revisor.responsavel if d.revisor else "",
+    )
+    while True:
+        try:
+            atribuicoes.registrar(caminho, a, modelo or atribuicoes.MODELO_PADRAO)
+            return
+        except PermissionError:
+            if not sim(f"  ⚠ Não consegui gravar {caminho} (aberto no Excel?). Feche o arquivo e tente de novo"):
+                print("  ⚠ Atribuição NÃO registrada na planilha do dia - anote manualmente.")
+                return
 
-    if not prazos:
-        print("  Nenhum prazo identificado neste e-mail.")
-        return sim("  Marcar como processado?")
 
-    tratado = True
-    for n, p in enumerate(prazos, 1):
-        fatal, avisos = sugerir_fatal(p, cfg)
-        mostrar_prazo(n, len(prazos), p, fatal, avisos)
-        acao = perguntar("  [A]gendar, [I]gnorar, [D]epois", "A").lower()[:1]
-        if acao == "i":
-            continue
-        if acao == "d":
-            tratado = False
-            continue
+def processar_demanda(n: int, total: int, d: Demanda, cfg, g, plan, aba: str, abas_busca: list[str],
+                      estado: Estado, caminho_atrib: str, simular: bool) -> str:
+    """Retorna 'atribuida', 'ignorada' ou 'adiada'."""
+    p = d.principal
+    ja_consta = plan.duplicada(aba, p.processo, d.fatal)
+    mostrar_demanda(n, total, d, ja_consta)
+    acao = perguntar("  [A]tribuir, [I]gnorar, [D]epois", "I" if ja_consta else "A").lower()[:1]
+    if acao == "d":
+        return "adiada"
+    if acao == "i":
+        if not simular:
+            estado.marcar(d, "ignorada")
+        return "ignorada"
 
-        existente = plan.buscar_processo(abas_busca, p.processo) if (plan and p.processo) else None
-        tarefa = montar_tarefa(p, fatal, cfg, existente)
-        if not tarefa:
-            tratado = False
-            continue
-        if simular:
-            print(f'  (simulação) Seria incluída na aba "{aba}" e agendada no Outlook.')
-            continue
-        if plan.duplicada(aba, p.processo, tarefa.fatal) and not sim(
-            "  ⚠ Já existe linha com este processo e o mesmo fatal na aba. Incluir mesmo assim?", False):
-            continue
-        linha = plan.incluir(aba, tarefa)
-        print(f'  ✔ Planilha: aba "{aba}", linha {linha}.')
-        convidados = [cfg.equipe.get(x, "") for x in (tarefa.executor, tarefa.revisor) if x] if cfg.convidar_equipe else []
-        links = criar_eventos(g, tarefa, p.processo, p.ato, email.link, cfg.eventos, convidados,
-                              cfg.lembrete_minutos, cfg.categoria_agenda)
-        print(f"  ✔ Outlook: {len(links)} compromisso(s) criado(s).")
-    return tratado
+    cal = calendario_para(p.processo, cfg.uf, cfg.feriados_extras)
+    existente = plan.buscar_processo(abas_busca, p.processo) if p.processo else None
+    tarefa = montar_tarefa(d, cfg, cal, existente)
+    if not tarefa:
+        return "adiada"
+    if simular:
+        print(f'  (simulação) Seria incluída na aba "{aba}", agendada no Outlook e registrada em {caminho_atrib}.')
+        return "atribuida"
+
+    linha = plan.incluir(aba, tarefa)
+    print(f'  ✔ Programação: aba "{aba}", linha {linha}.')
+    convidados = [cfg.equipe.get(x, "") for x in (tarefa.executor, tarefa.revisor) if x] if cfg.convidar_equipe else []
+    links = criar_eventos(g, tarefa, p.processo, "Legal One", cfg.eventos, convidados,
+                          cfg.lembrete_minutos, cfg.categoria_agenda)
+    print(f"  ✔ Outlook: {len(links)} compromisso(s).")
+    registrar_atribuicao(caminho_atrib, d, tarefa, cfg.atrib_modelo)
+    print("  ✔ Atribuição registrada para o andamento no L.O.")
+    estado.marcar(d, "atribuida")
+    return "atribuida"
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="publicacoes_app", description=__doc__)
     ap.add_argument("-c", "--config", default="config.toml")
-    ap.add_argument("--dias", type=int, help="buscar e-mails dos últimos N dias")
-    ap.add_argument("--desde", help="buscar e-mails desde DD/MM/AAAA")
-    ap.add_argument("--aba", help="nome da aba da planilha (padrão: semana corrente)")
-    ap.add_argument("--simular", action="store_true", help="não grava nada (planilha, Outlook, estado)")
-    ap.add_argument("--reprocessar", action="store_true", help="inclui e-mails já processados")
+    ap.add_argument("--arquivo", help="planilha do L.O. (padrão: a mais recente na pasta configurada)")
+    ap.add_argument("--aba", help="aba da Programação (padrão: semana corrente)")
+    ap.add_argument("--todas", action="store_true", help="inclui tarefas já tratadas e vencidas há mais tempo")
+    ap.add_argument("--simular", action="store_true", help="não grava nada (Programação, Outlook, atribuições, estado)")
     args = ap.parse_args(argv)
 
     if not Path(args.config).exists():
@@ -219,44 +225,44 @@ def main(argv: list[str] | None = None) -> int:
         print("Cadastre a equipe na seção [equipe] do config.toml.")
         return 1
 
-    g = Graph(cfg.client_id, cfg.tenant_id, cfg.token_cache)
+    arquivo = args.arquivo or localizar_arquivo(cfg.lo_pasta, cfg.lo_padrao)
+    if not arquivo or not os.path.exists(arquivo):
+        print(f'Planilha do L.O. não encontrada em "{cfg.lo_pasta}" ({cfg.lo_padrao}).')
+        return 1
+    gerado = datetime.fromtimestamp(os.path.getmtime(arquivo))
+    print(f"Planilha do L.O.: {arquivo} (gerada em {gerado:%d/%m/%Y %H:%M})")
+
+    cal = CalendarioForense(uf=cfg.uf, extras=cfg.feriados_extras)
+    demandas = agrupar(ler_tarefas(arquivo), cal, cfg.d_menos)
     estado = Estado(cfg.arquivo_estado)
-    extrator = criar_extrator(cfg.modelo)
-    print(f"Identificação de prazos: {'Claude (' + cfg.modelo + ')' if not isinstance(extrator, ExtratorRegex) else 'extrator simples (sem ANTHROPIC_API_KEY)'}")
-
-    if args.desde:
-        desde = datetime.strptime(args.desde, "%d/%m/%Y").replace(tzinfo=timezone.utc)
-    else:
-        desde = janela_inicial(args.dias or cfg.dias_retroativos)
-
-    pasta_id = localizar_pasta(g, cfg.pasta)
-    emails = listar(g, pasta_id, desde, cfg.remetentes)
-    if not args.reprocessar:
-        emails = [e for e in emails
-                  if not estado.processado(e.id) and cfg.categoria_processado not in e.categorias]
-    print(f'{len(emails)} e-mail(s) a analisar na pasta "{cfg.pasta}" desde {desde.astimezone():%d/%m/%Y}.')
-    if not emails:
+    if not args.todas:
+        corte = hoje() - timedelta(days=cfg.ignorar_vencidas_ha_dias)
+        demandas = [d for d in demandas if not estado.tratada(d) and d.fatal >= corte]
+    print(f"{len(demandas)} prazo(s) a atribuir.")
+    if not demandas:
         return 0
 
+    caminho_atrib = atribuicoes.caminho_do_dia(cfg.atrib_pasta, hoje())
+    g = Graph(cfg.client_id, cfg.tenant_id, cfg.token_cache)
+    contagem = {"atribuida": 0, "ignorada": 0, "adiada": 0}
     with Planilha(g, cfg.sp_host, cfg.sp_site, cfg.sp_arquivo) as plan:
         abas = plan.abas()
         aba = args.aba or escolher_aba(abas, hoje())
         if not aba or aba not in abas:
             print(f"Aba da semana não encontrada (abas: {', '.join(abas[:5])}...). Use --aba.")
             return 1
-        print(f'Planilha: {cfg.sp_arquivo} -> aba "{aba}"')
-        # Abas recentes para reaproveitar Cliente/Caso de processos já cadastrados.
+        print(f'Programação: {cfg.sp_arquivo} -> aba "{aba}"')
         abas_busca = sorted((a for a in abas if data_da_aba(a)), key=data_da_aba, reverse=True)[:6]
 
-        for email in emails:
-            tratado = processar_email(email, extrator, cfg, g, plan, aba, abas_busca, args.simular)
-            if tratado and not args.simular:
-                estado.marcar(email.id, email.assunto)
-                try:
-                    marcar_processado(g, email, cfg.categoria_processado)
-                except Exception as e:
-                    print(f"  ⚠ Não foi possível categorizar o e-mail no Outlook: {e}")
-    print("\nConcluído.")
+        for n, d in enumerate(demandas, 1):
+            r = processar_demanda(n, len(demandas), d, cfg, g, plan, aba, abas_busca, estado,
+                                  caminho_atrib, args.simular)
+            contagem[r] += 1
+
+    print(f"\nConcluído: {contagem['atribuida']} atribuída(s), {contagem['ignorada']} ignorada(s), "
+          f"{contagem['adiada']} para depois.")
+    if contagem["atribuida"] and not args.simular:
+        print(f"Atribuições do dia: {caminho_atrib}")
     return 0
 
 
