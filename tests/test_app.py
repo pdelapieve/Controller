@@ -205,8 +205,9 @@ def test_planilha_de_atribuicoes(tmp_path):
     linha = dict(zip(cab, [c.value for c in ws[2]]))
     assert linha["Executor"] == "Danieli" and linha["ID tarefa executor (L.O.)"] == "101"
     assert linha["Andamento lançado"] == "Não"
-    assert "Executor: Danieli (Prazo LO 13/10/2026)" in linha["Texto do andamento"]
-    assert "Revisor: Pedro (revisão 15/10/2026)" in linha["Texto do andamento"]
+    assert linha["Texto do andamento"] == "PEDRO - Novo Fluxo: Executor: Danieli, Revisor: Pedro."
+    a.revisor = ""
+    assert a.texto() == "PEDRO - Novo Fluxo: Executor: Danieli."
 
 
 # ------------------------------------------------------------ fluxo completo

@@ -147,7 +147,7 @@ def montar_tarefa(d: Demanda, cfg, cal: CalendarioForense, existente: dict | Non
     return tarefa if sim("  Confirmar?") else None
 
 
-def registrar_atribuicao(caminho: str, d: Demanda, t: Tarefa, modelo: str) -> None:
+def registrar_atribuicao(caminho: str, d: Demanda, t: Tarefa, modelo: str, autor: str) -> None:
     a = atribuicoes.Atribuicao(
         cliente=t.cliente,
         processo=d.principal.processo or "",
@@ -165,7 +165,7 @@ def registrar_atribuicao(caminho: str, d: Demanda, t: Tarefa, modelo: str) -> No
     )
     while True:
         try:
-            atribuicoes.registrar(caminho, a, modelo or atribuicoes.MODELO_PADRAO)
+            atribuicoes.registrar(caminho, a, modelo or atribuicoes.MODELO_PADRAO, autor)
             return
         except PermissionError:
             if not sim(f"  ⚠ Não consegui gravar {caminho} (aberto no Excel?). Feche o arquivo e tente de novo"):
@@ -202,7 +202,7 @@ def processar_demanda(n: int, total: int, d: Demanda, cfg, g, plan, aba: str, ab
     links = criar_eventos(g, tarefa, p.processo, "Legal One", cfg.eventos, convidados,
                           cfg.lembrete_minutos, cfg.categoria_agenda)
     print(f"  ✔ Outlook: {len(links)} compromisso(s).")
-    registrar_atribuicao(caminho_atrib, d, tarefa, cfg.atrib_modelo)
+    registrar_atribuicao(caminho_atrib, d, tarefa, cfg.atrib_modelo, cfg.atrib_autor)
     print("  ✔ Atribuição registrada para o andamento no L.O.")
     estado.marcar(d, "atribuida")
     return "atribuida"

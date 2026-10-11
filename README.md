@@ -14,7 +14,8 @@ App de linha de comando que:
    corrente**, em ordem de Prazo LO, copiando a fórmula da coluna *Vencimento*;
 6. registra a atribuição em **`Atribuicoes_<AAAA-MM-DD>.xlsx`** – a planilha do
    dia com pasta, processo, executor, revisor, datas, IDs das tarefas no L.O. e o
-   **texto do andamento** pronto para lançar na pasta do processo.
+   **texto do andamento** pronto para lançar na pasta do processo
+   (`PEDRO - Novo Fluxo: Executor: X, Revisor: Y.`).
 
 Nada é gravado sem confirmação. Prazos já tratados (atribuídos ou ignorados)
 não voltam nas execuções seguintes; prazos que já estão na aba da semana com o
@@ -49,9 +50,10 @@ Desktop está em [`docs/rotina_prazos_do_mes_LO.md`](docs/rotina_prazos_do_mes_L
 ## Andamentos no L.O.
 
 A planilha `Atribuicoes_<data>.xlsx` é o resumo do dia para a controladoria.
-Para lançar os andamentos automaticamente pelo Claude in Chrome, há uma
-proposta de tarefa em [`docs/rotina_andamentos_LO.md`](docs/rotina_andamentos_LO.md)
-(falta definir o tipo de andamento usado pela controladoria).
+O texto do andamento segue o padrão do escritório
+(`PEDRO - Novo Fluxo: Executor: Danieli, Revisor: Pedro.`). Para lançá-los
+automaticamente pelo Claude in Chrome, use a tarefa descrita em
+[`docs/rotina_andamentos_LO.md`](docs/rotina_andamentos_LO.md).
 
 ## Instalação
 

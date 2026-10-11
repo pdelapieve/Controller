@@ -18,8 +18,12 @@ ignorar_vencidas_ha_dias = 7
 [atribuicoes]
 # Planilha diária Atribuicoes_AAAA-MM-DD.xlsx (base para os andamentos no L.O.).
 pasta = 'C:\Users\Betina\Downloads'
-# Texto do andamento. Campos: {providencia} {executor} {lo} {revisor} {revisao} {fatal} {cliente} {processo}
-modelo_texto = "Atribuição de prazo – {providencia}. Executor: {executor} (Prazo LO {lo}). Revisor: {revisor} (revisão {revisao}). Prazo fatal: {fatal}."
+# Andamento de ajuste de fluxo no L.O. (tipo "Andamento"):
+#   "PEDRO - Novo Fluxo: Executor: Danieli, Revisor: Pedro."
+autor = "PEDRO"
+# Para mudar o texto, descomente. Campos: {autor} {executor} {revisor} {lo}
+# {revisao} {fatal} {providencia} {cliente} {processo}
+# modelo_texto = "{autor} - Novo Fluxo: Executor: {executor}, Revisor: {revisor}."
 
 [planilha]
 # Planilha de programação no SharePoint.

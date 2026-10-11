@@ -31,10 +31,9 @@ COLUNAS = [
 ]
 COLUNAS_DATA = {"Prazo LO", "Revisão", "Fatal"}
 
-MODELO_PADRAO = (
-    "Atribuição de prazo – {providencia}. Executor: {executor} (Prazo LO {lo}). "
-    "Revisor: {revisor} (revisão {revisao}). Prazo fatal: {fatal}."
-)
+# Padrão usado no L.O. para ajuste de fluxo (andamento do tipo "Andamento").
+MODELO_PADRAO = "{autor} - Novo Fluxo: Executor: {executor}, Revisor: {revisor}."
+MODELO_SEM_REVISOR = "{autor} - Novo Fluxo: Executor: {executor}."
 
 
 @dataclass
@@ -53,9 +52,12 @@ class Atribuicao:
     id_revisor: str = ""
     responsavel_revisor: str = ""
 
-    def texto(self, modelo: str = MODELO_PADRAO) -> str:
+    def texto(self, modelo: str = MODELO_PADRAO, autor: str = "PEDRO") -> str:
         fmt = lambda d: f"{d:%d/%m/%Y}" if d else "não definido"
+        if not self.revisor and modelo == MODELO_PADRAO:
+            modelo = MODELO_SEM_REVISOR
         return modelo.format(
+            autor=autor,
             providencia=self.providencia or "-",
             executor=self.executor or "não definido",
             revisor=self.revisor or "sem revisor",
@@ -87,7 +89,7 @@ def _novo_livro() -> Workbook:
     return wb
 
 
-def registrar(caminho: str, a: Atribuicao, modelo: str = MODELO_PADRAO) -> int:
+def registrar(caminho: str, a: Atribuicao, modelo: str = MODELO_PADRAO, autor: str = "PEDRO") -> int:
     """Acrescenta a atribuição à planilha do dia (cria se não existir). Retorna a linha."""
     wb = load_workbook(caminho) if os.path.exists(caminho) else _novo_livro()
     ws = wb[ABA]
@@ -106,7 +108,7 @@ def registrar(caminho: str, a: Atribuicao, modelo: str = MODELO_PADRAO) -> int:
         "Responsável atual executor (L.O.)": a.responsavel_executor,
         "ID tarefa revisor (L.O.)": a.id_revisor,
         "Responsável atual revisor (L.O.)": a.responsavel_revisor,
-        "Texto do andamento": a.texto(modelo),
+        "Texto do andamento": a.texto(modelo, autor),
         "Andamento lançado": "Não",
     }
     linha = ws.max_row + 1

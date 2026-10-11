@@ -18,6 +18,7 @@ class Config:
     ignorar_vencidas_ha_dias: int = 7
     atrib_pasta: str = r"C:\Users\Betina\Downloads"
     atrib_modelo: str = ""
+    atrib_autor: str = "PEDRO"
     sp_host: str = ""
     sp_site: str = ""
     sp_arquivo: str = ""
@@ -67,6 +68,7 @@ def carregar(caminho: str | Path) -> Config:
         ignorar_vencidas_ha_dias=int(lo.get("ignorar_vencidas_ha_dias", 7)),
         atrib_pasta=at.get("pasta", lo.get("pasta", Config.atrib_pasta)),
         atrib_modelo=at.get("modelo_texto", ""),
+        atrib_autor=at.get("autor", "PEDRO"),
         sp_host=pl["host"],
         sp_site=pl["site"],
         sp_arquivo=pl["arquivo"],
