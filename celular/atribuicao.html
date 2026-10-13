@@ -270,7 +270,7 @@ function msgMcp(e){
   if (c==="needs_reauth") return "Reconecte o Microsoft 365 em claude.ai → Configurações → Conectores.";
   if (c==="server_not_connected" || c==="selection_required") return "Adicione ou escolha o conector Microsoft 365 em claude.ai → Configurações → Conectores.";
   if (c==="not_in_manifest" || c==="consent_required" || c==="approval_required") return "Esta página precisa da sua permissão para ler o OneDrive. Toque em Permissões no menu do artifact.";
-  if (c==="tool_error") return "O OneDrive respondeu com erro: "+(e.message||"");
+  if (c==="tool_error") return "Não encontrei a planilha do L.O.: "+(e.message||"");
   return "Não consegui falar com o Microsoft 365 agora ("+(c||"erro")+"). Tente recarregar em instantes.";
 }
 async function ler(uri){
@@ -279,20 +279,27 @@ async function ler(uri){
   const t = (r.content||[]).find(b=>b.type==="text"); return t ? t.text : JSON.stringify(r.payload);
 }
 
-async function carregarLO(){
-  const agora = new Date();
-  const candidatos = [0,-1].map(n => { const d = new Date(agora.getFullYear(), agora.getMonth()+n, 1); return `Tarefas_Pendentes_LegalOne_${MESES[d.getMonth()]}-${d.getFullYear()}.xlsx`; });
-  let ultimoErro = null;
-  for (const nome of candidatos){
-    try {
-      const texto = await ler(`file:///${DRIVE}/${nome}`);
-      if (!texto.includes("## Sheet:")) { ultimoErro = {code:"tool_error", message:"arquivo sem planilhas"}; continue; }
-      const base = (/Data base:\s*(\d{2}\/\d{2}\/\d{4})/.exec(texto)||[])[1];
-      $("fonte").textContent = `${nome.replace(".xlsx","")}${base ? " · gerada em "+base : ""}`;
-      return lerTarefas(texto);
-    } catch (e){ ultimoErro = e; if (e.code && e.code!=="tool_error") break; }
+// Lista a raiz do OneDrive e escolhe a planilha do L.O. do mês mais recente
+// (arquivos na raiz só podem ser lidos pelo identificador, não pelo nome).
+function arquivosLO(listagem){
+  const re = /Tarefas_Pendentes_LegalOne_([A-Za-zÀ-ÿ]+)-(\d{4})(_\d+)?\.xlsx\s*\(file,[^)]*\)\s*(file:\/\/\/[^\s\/]+\/01[A-Z0-9]{32})/g;
+  const achados = []; let m;
+  while ((m = re.exec(listagem))){
+    const mes = MESES.findIndex(x => x.toLowerCase() === m[1].toLowerCase());
+    if (mes < 0) continue;
+    achados.push({nome: m[0].split(/\s*\(file/)[0], ordem: Number(m[2])*12 + mes, copia: m[3] ? Number(m[3].slice(1)) : 0, uri: m[4]});
   }
-  throw ultimoErro || new Error("Planilha do L.O. não encontrada.");
+  return achados.sort((x,y) => y.ordem - x.ordem || y.copia - x.copia);
+}
+async function carregarLO(){
+  const lista = arquivosLO(await ler(`file:///${DRIVE}/`));
+  if (!lista.length) throw {code:"tool_error", message:'nenhum arquivo "Tarefas_Pendentes_LegalOne_<Mês>-<Ano>.xlsx" na raiz do seu OneDrive.'};
+  const arq = lista[0];
+  const texto = await ler(arq.uri);
+  if (!texto.includes("## Sheet:")) throw {code:"tool_error", message:`${arq.nome} veio sem planilhas.`};
+  const base = (/Data base:\s*(\d{2}\/\d{2}\/\d{4})/.exec(texto)||[])[1];
+  $("fonte").textContent = `${arq.nome.replace(".xlsx","")}${base ? " · gerada em "+base : ""}`;
+  return lerTarefas(texto);
 }
 
 // ---------------------------------------------------------------- render
