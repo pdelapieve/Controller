@@ -14,7 +14,8 @@ conta — não precisa registrar app na Microsoft.
 3. Você escolhe executor e revisor (e ajusta datas e dados da Programação);
    a atribuição fica guardada na própria página, com o texto do andamento
    (`PEDRO - Novo Fluxo: Executor: X, Revisor: Y.`).
-4. No computador da rotina, a tarefa "Aplicar atribuições do celular" grava na
+4. No computador da rotina, a tarefa "Atribuir prazos" faz o mesmo numa
+   conversa e grava na hora; e a tarefa "Aplicar atribuições do celular" grava na
    Programação (Excel para a Web), no Outlook e no L.O. pelo Claude in Chrome,
    e marca cada passo como feito na página.
 
