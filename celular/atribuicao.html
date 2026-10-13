@@ -281,19 +281,51 @@ async function ler(uri){
 
 // Lista a raiz do OneDrive e escolhe a planilha do L.O. do mês mais recente
 // (arquivos na raiz só podem ser lidos pelo identificador, não pelo nome).
-function arquivosLO(listagem){
-  const re = /Tarefas_Pendentes_LegalOne_([A-Za-zÀ-ÿ]+)-(\d{4})(_\d+)?\.xlsx\s*\(file,[^)]*\)\s*(file:\/\/\/[^\s\/]+\/01[A-Z0-9]{32})/g;
-  const achados = []; let m;
-  while ((m = re.exec(listagem))){
-    const mes = MESES.findIndex(x => x.toLowerCase() === m[1].toLowerCase());
-    if (mes < 0) continue;
-    achados.push({nome: m[0].split(/\s*\(file/)[0], ordem: Number(m[2])*12 + mes, copia: m[3] ? Number(m[3].slice(1)) : 0, uri: m[4]});
-  }
-  return achados.sort((x,y) => y.ordem - x.ordem || y.copia - x.copia);
+// A listagem pode chegar como texto ("Nome (file, N bytes) file:///…") ou
+// como dados estruturados; os dois formatos são aceitos.
+const NOME_LO = /Tarefas_Pendentes_LegalOne_([A-Za-zÀ-ÿ]+)-(\d{4})(_\d+)?\.xlsx/;
+const URI_ITEM = /file:\/\/\/[^\s"'\\\/]+\/01[A-Z0-9]{32}/;
+function candidatoLO(nome, uri, lista){
+  const m = NOME_LO.exec(nome||""); if (!m || !uri) return;
+  const mes = MESES.findIndex(x => x.toLowerCase() === m[1].toLowerCase()); if (mes < 0) return;
+  lista.push({nome: m[0], ordem: Number(m[2])*12 + mes, copia: m[3] ? Number(m[3].slice(1)) : 0, uri});
+}
+function arquivosLO(resultado){
+  const achados = [];
+  // 1) dados estruturados: objetos com um nome e um uri/id
+  const visitar = (v, prof) => {
+    if (!v || typeof v !== "object" || prof > 6) return;
+    if (Array.isArray(v)) return v.forEach(x => visitar(x, prof+1));
+    const strings = Object.values(v).filter(x => typeof x === "string");
+    const nome = strings.find(x => NOME_LO.test(x));
+    if (nome){
+      let uri = (strings.map(x => (URI_ITEM.exec(x)||[])[0]).find(Boolean));
+      const id = strings.find(x => /^01[A-Z0-9]{32}$/.test(x));
+      if (!uri && id) uri = `file:///${DRIVE}/${id}`;
+      candidatoLO(nome, uri, achados);
+    }
+    Object.values(v).forEach(x => visitar(x, prof+1));
+  };
+  visitar(resultado.structuredContent, 0);
+  if (resultado.payload && typeof resultado.payload === "object") visitar(resultado.payload, 0);
+  // 2) texto: "Nome (file, N bytes) file:///drive/ITEM"
+  const textos = [typeof resultado.payload === "string" ? resultado.payload : "",
+                  ...(resultado.content||[]).filter(b=>b.type==="text").map(b=>b.text)];
+  const re = new RegExp(NOME_LO.source + "[\\s\\S]{0,200}?(" + URI_ITEM.source + ")", "g");
+  for (const t of textos){ let m; while ((m = re.exec(t))) candidatoLO(m[0], m[4], achados); }
+  const vistos = new Set();
+  return achados.filter(a => !vistos.has(a.uri) && vistos.add(a.uri))
+                .sort((x,y) => y.ordem - x.ordem || y.copia - x.copia);
+}
+function formato(r){
+  const tipo = v => Array.isArray(v) ? `lista[${v.length}]` : v && typeof v === "object" ? `{${Object.keys(v).slice(0,6).join(",")}}` : typeof v;
+  const t = ((r.content||[]).find(b=>b.type==="text")||{}).text || "";
+  return `payload ${tipo(r.payload)}, structured ${tipo(r.structuredContent)}, texto ${t.length} caracteres: "${t.slice(0,140).replace(/\s+/g," ")}"`;
 }
 async function carregarLO(){
-  const lista = arquivosLO(await ler(`file:///${DRIVE}/`));
-  if (!lista.length) throw {code:"tool_error", message:'nenhum arquivo "Tarefas_Pendentes_LegalOne_<Mês>-<Ano>.xlsx" na raiz do seu OneDrive.'};
+  const r = await mcp.callTool(M365, "read_resource", {uri: `file:///${DRIVE}/`});
+  const lista = arquivosLO(r);
+  if (!lista.length) throw {code:"tool_error", message:'nenhum arquivo "Tarefas_Pendentes_LegalOne_<Mês>-<Ano>.xlsx" na listagem do OneDrive. Formato recebido: ' + formato(r)};
   const arq = lista[0];
   const texto = await ler(arq.uri);
   if (!texto.includes("## Sheet:")) throw {code:"tool_error", message:`${arq.nome} veio sem planilhas.`};
