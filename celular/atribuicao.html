@@ -1,0 +1,463 @@
+<title>Atribuição de Prazos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: uma coluna de cartões (fila de prazos), formulário que abre dentro do cartão; abas no topo. */
+:root{
+  --bg:#f4f6fa; --surface:#ffffff; --ink:#0f1a2e; --muted:#5b6578; --line:#dde2ec;
+  --navy:#00214d; --accent:#c5551c; --accent-ink:#ffffff; --chip:#e9edf5;
+  --ok:#1f7a4d; --ok-bg:#e3f3ea; --warn:#9a5b00; --warn-bg:#fdf0d9; --bad:#b3261e; --bad-bg:#fbe5e3;
+  --f-display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --f-body:"Public Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0b1220; --surface:#121b2d; --ink:#e7ecf5; --muted:#9aa5b8; --line:#26324a;
+  --navy:#9db8ff; --accent:#e8743a; --accent-ink:#1a0d05; --chip:#1c2740;
+  --ok:#6fd3a0; --ok-bg:#12301f; --warn:#f2b45a; --warn-bg:#33240b; --bad:#ff8a80; --bad-bg:#3a1512; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0b1220; --surface:#121b2d; --ink:#e7ecf5; --muted:#9aa5b8; --line:#26324a;
+  --navy:#9db8ff; --accent:#e8743a; --accent-ink:#1a0d05; --chip:#1c2740;
+  --ok:#6fd3a0; --ok-bg:#12301f; --warn:#f2b45a; --warn-bg:#33240b; --bad:#ff8a80; --bad-bg:#3a1512; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--f-body);margin:0}
+.wrap{max-width:720px;margin:0 auto;padding-inline:16px;padding-block:14px 48px}
+header{display:flex;flex-direction:column;gap:4px;padding-block:6px 12px}
+h1{font:700 1.6rem/1.1 var(--f-display);margin:0;color:var(--navy);text-wrap:balance}
+.sub{color:var(--muted);font-size:.85rem}
+.tabs{display:flex;gap:6px;position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);padding-block:8px;z-index:2}
+.tab{flex:1;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:10px 8px;font:600 .9rem var(--f-body);cursor:pointer}
+.tab[aria-selected="true"]{background:var(--navy);border-color:var(--navy);color:var(--bg)}
+.tab .n{font-family:var(--f-mono);font-weight:500;opacity:.85;margin-left:4px}
+.list{display:flex;flex-direction:column;gap:10px;margin-top:6px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.card.urg{border-left:4px solid var(--bad)}
+.card.soon{border-left:4px solid var(--warn)}
+.top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.cli{font-weight:600;min-width:0;overflow-wrap:anywhere}
+.fatal{text-align:right;flex:none}
+.fatal b{display:block;font:500 1.05rem var(--f-mono);font-variant-numeric:tabular-nums}
+.fatal small{color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em}
+.prov{overflow-wrap:anywhere}
+.meta{display:flex;flex-wrap:wrap;gap:6px 12px;color:var(--muted);font-size:.8rem}
+.mono{font-family:var(--f-mono);font-size:.78rem}
+.roles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px}
+.role{background:var(--chip);border-radius:8px;padding:6px 8px;font-size:.8rem;min-width:0}
+.role span{display:block;color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.06em}
+.pill{display:inline-block;border-radius:999px;padding:2px 8px;font-size:.72rem;font-weight:600}
+.pill.bad{background:var(--bad-bg);color:var(--bad)} .pill.warn{background:var(--warn-bg);color:var(--warn)} .pill.ok{background:var(--ok-bg);color:var(--ok)} .pill.mut{background:var(--chip);color:var(--muted)}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+button.b{border-radius:10px;padding:10px 14px;font:600 .9rem var(--f-body);cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+button.b.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button.b:focus-visible,.tab:focus-visible,.chipbtn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.b:disabled{opacity:.5;cursor:default}
+form.f{display:flex;flex-direction:column;gap:12px;border-top:1px dashed var(--line);padding-top:12px}
+.lbl{font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chipbtn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:8px 12px;font:500 .9rem var(--f-body);cursor:pointer}
+.chipbtn[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:var(--bg)}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-width:0}
+textarea{min-height:60px;resize:vertical}
+.note{font-size:.8rem;color:var(--muted)}
+.banner{border-radius:10px;padding:12px 14px;font-size:.9rem;background:var(--warn-bg);color:var(--warn)}
+.banner.err{background:var(--bad-bg);color:var(--bad)}
+.empty{color:var(--muted);text-align:center;padding:28px 12px;border:1px dashed var(--line);border-radius:12px}
+.status{display:flex;flex-wrap:wrap;gap:6px}
+.toggle{border:1px solid var(--line);border-radius:999px;padding:6px 10px;font:600 .78rem var(--f-body);cursor:pointer;background:var(--surface);color:var(--muted)}
+.toggle[aria-pressed="true"]{background:var(--ok-bg);border-color:var(--ok);color:var(--ok)}
+.andam{font-family:var(--f-mono);font-size:.8rem;background:var(--chip);border-radius:8px;padding:8px;overflow-wrap:anywhere;user-select:all}
+details summary{cursor:pointer;color:var(--muted);font-size:.85rem}
+@media (prefers-reduced-motion:no-preference){.card{transition:border-color .15s}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Atribuição de Prazos</h1>
+    <div class="sub" id="fonte">Carregando a planilha do Legal One…</div>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab-fila" aria-selected="true">A atribuir<span class="n" id="n-fila">–</span></button>
+    <button class="tab" role="tab" id="tab-feitas" aria-selected="false">Atribuídos<span class="n" id="n-feitas">–</span></button>
+  </div>
+
+  <div id="aviso" hidden></div>
+  <section id="fila" class="list" aria-live="polite">
+    <div class="empty">Os prazos da última planilha "Prazos do Mês no L.O." aparecem aqui, agrupados por processo, com a tarefa do executor e a do revisor.</div>
+  </section>
+  <section id="feitas" class="list" hidden>
+    <div class="empty">Nenhuma atribuição ainda. Atribua um prazo na aba "A atribuir".</div>
+  </section>
+</div>
+
+<script>
+"use strict";
+// ---------------------------------------------------------------- configuração
+const M365 = "Microsoft 365";
+const DRIVE = "b!g_iPJ4XzCEmWqN1f_C5CaNMyQirGFLBNmhzu4JE9SWyzKODcprNqR4oAVwrS36eM";            // OneDrive do Pedro
+const PROGRAMACAO = "file:///b!7viyhFJxZEGJ4FNvLF-9M0hcDKSzZ4pEgzewq8Tl6fNkSUXDq0B5RYddHJs1JCHq/01HNHKUHXRDM4RWSIPDVFKDYZZIFSHUKAW";
+const EQUIPE = ["Pedro","Heron","Tiago","Lorenzo","Danieli","Arthur"];
+const AUTOR = "PEDRO";
+const D_MENOS = 2;                 // a data da controladoria no L.O. é o D-2 do fatal
+const EXTRAS = ["2026-10-28"];     // dias sem expediente forense além dos feriados
+const MESES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+
+// ---------------------------------------------------------------- datas e dias úteis
+const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const br = s => s ? s.slice(8,10)+"/"+s.slice(5,7)+"/"+s.slice(0,4) : "–";
+const DIAS = ["dom","seg","ter","qua","qui","sex","sáb"];
+const fromIso = s => { const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d); };
+const fromBr = s => { const m = /(\d{2})\/(\d{2})\/(\d{4})/.exec(s||""); return m ? `${m[3]}-${m[2]}-${m[1]}` : null; };
+function pascoa(a){const b=a%19,c=Math.floor(a/100),d=a%100,e=Math.floor(c/4),f=c%4,g=Math.floor((c+8)/25),h=Math.floor((c-g+1)/3),i=(19*b+c-e-h+15)%30,k=Math.floor(d/4),l=d%4,L=(32+2*f+2*k-i-l)%7,m=Math.floor((b+11*i+22*L)/451);const mes=Math.floor((i+L-7*m+114)/31),dia=((i+L-7*m+114)%31)+1;return new Date(a,mes-1,dia);}
+const feriadosCache = {};
+function feriados(ano, federal){
+  const k = ano+(federal?"F":"");
+  if (feriadosCache[k]) return feriadosCache[k];
+  const p = pascoa(ano), add = n => iso(new Date(p.getFullYear(), p.getMonth(), p.getDate()+n));
+  const s = new Set(["01-01","04-21","05-01","09-07","09-20","10-12","11-02","11-15","11-20","12-25"].map(x=>`${ano}-${x}`));
+  [-48,-47,-2,60].forEach(n=>s.add(add(n)));           // Carnaval, Sexta Santa, Corpus Christi
+  if (federal){ [-4,-3].forEach(n=>s.add(add(n))); ["08-11","11-01","12-08"].forEach(x=>s.add(`${ano}-${x}`)); }
+  EXTRAS.forEach(x=>s.add(x));
+  return feriadosCache[k] = s;
+}
+function util(d, federal){
+  const w = d.getDay(); if (w===0||w===6) return false;
+  const m = d.getMonth()+1, dia = d.getDate();
+  if ((m===12&&dia>=20)||(m===1&&dia<=20)) return false;  // recesso forense
+  return !feriados(d.getFullYear(), federal).has(iso(d));
+}
+function somarUteis(s, n, federal){
+  const d = fromIso(s); const passo = n>=0?1:-1; let r = Math.abs(n);
+  while (r){ d.setDate(d.getDate()+passo); if (util(d, federal)) r--; }
+  return iso(d);
+}
+const hoje = iso(new Date());
+
+// ---------------------------------------------------------------- leitura da planilha do L.O.
+function hash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return "t"+(h>>>0).toString(16);}
+const CNJ = /\b\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}\b/;
+
+function secao(texto, nomeAba){
+  const linhas = texto.split(/\r?\n/);
+  let i = linhas.findIndex(l => l.startsWith("## Sheet: ") && (!nomeAba || l.slice(10).startsWith(nomeAba)));
+  if (i < 0) return null;
+  const nome = linhas[i].slice(10).split(" — ")[0];
+  const out = [];
+  for (i = i+1; i < linhas.length; i++){
+    const l = linhas[i];
+    if (l.startsWith("## Sheet: ") || l.startsWith("Formulas:")) break;
+    if (!l.trim() || /^\[\d+ empty rows?\]$/.test(l.trim())) continue;
+    out.push(l.split("\t"));
+  }
+  return {nome, cab: (out[0]||[]).map(c=>c.trim().toLowerCase()), linhas: out.slice(1)};
+}
+
+function papelDe(desc){
+  if (/acompanhamento\s+cj/i.test(desc)) return "cj";
+  const m = /\(?\s*(executor|revisor)\s*\)?/i.exec(desc);
+  return m ? m[1].toLowerCase() : "outro";
+}
+const semPapel = desc => desc.replace(/\(?\s*(executor|revisor)\s*\)?/ig," ").replace(/[^\p{L}\p{N}]+/gu," ").trim().toLowerCase();
+const eventoDe = desc => (/(eventos?\s+[\d\sae]+|ID\s*\d+)/i.exec(desc)||[""])[0].replace(/\s+/g," ").trim().toLowerCase();
+
+function lerTarefas(texto){
+  const s = secao(texto, "Tarefas Pendentes");
+  if (!s) throw new Error('A planilha não tem a aba "Tarefas Pendentes".');
+  const c = n => s.cab.indexOf(n);
+  const iVen = c("vencimento"), iResp = c("responsável"), iCP = c("cliente/processo"), iTar = c("tarefa"),
+        iId = c("id"), iCli = c("cliente"), iProc = c("processo"), iPasta = c("pasta"), iTipo = c("tipo");
+  return s.linhas.map(l => {
+    const g = i => i>=0 ? (l[i]||"").trim() : "";
+    const venc = fromBr(g(iVen)) || (/^\d{4}-\d{2}-\d{2}/.test(g(iVen)) ? g(iVen).slice(0,10) : null);
+    if (!venc) return null;
+    let cliente = g(iCli), processo = g(iProc), pasta = g(iPasta);
+    const cp = g(iCP);
+    if (cp){
+      const partes = cp.split("•").map(x=>x.trim());
+      if (cp.includes("(sem vínculo)")) { /* tarefa sem pasta */ }
+      else {
+        cliente = cliente || partes[0] || "";
+        processo = processo || (partes.find(x=>/^Nº/.test(x))||"").replace(/^Nº\s*/,"");
+        pasta = pasta || (partes.find(x=>/^Pasta:/i.test(x))||"").replace(/^Pasta:\s*/i,"");
+      }
+    }
+    const desc = g(iTar);
+    if (!cliente && cp.includes("(sem vínculo)")) cliente = desc.split(" - ")[0].trim();
+    const tipo = g(iTipo);
+    return {
+      id: g(iId) || hash([cp||cliente+processo, desc, venc].join("|")),
+      venc, resp: g(iResp), cliente, processo, pasta, desc, tipo,
+      papel: papelDe(tipo+" "+desc),
+    };
+  }).filter(Boolean);
+}
+
+function agrupar(tarefas){
+  const vinc = t => t.pasta || t.processo || t.cliente;
+  const grupos = new Map(), cjs = [];
+  for (const t of tarefas.sort((a,b)=>a.venc.localeCompare(b.venc))){
+    if (t.papel === "cj"){ cjs.push(t); continue; }
+    const k = vinc(t)+"|"+semPapel(t.desc);
+    if (!grupos.has(k)) grupos.set(k, {executor:null, revisor:null, outros:[], cj:null});
+    const g = grupos.get(k);
+    if (t.papel === "executor" && !g.executor) g.executor = t;
+    else if (t.papel === "revisor" && !g.revisor) g.revisor = t;
+    else g.outros.push(t);
+  }
+  const demandas = [];
+  for (const g of grupos.values()){
+    const tarefasG = [g.executor, g.revisor, ...g.outros].filter(Boolean);
+    const base = tarefasG[0];
+    const ultima = tarefasG.map(t=>t.venc).sort().pop();
+    // tarefa "Acompanhamento CJ" da controladoria: mesma pasta, mesmo evento, data >= a do grupo
+    const ev = eventoDe(base.desc);
+    const cand = cjs.filter(c => vinc(c)===vinc(base) && c.venc >= ultima && !c.usado)
+                    .sort((a,b)=> (eventoDe(b.desc)===ev) - (eventoDe(a.desc)===ev) || a.venc.localeCompare(b.venc));
+    if (cand.length && g.executor){ g.cj = cand[0]; g.cj.usado = true; }
+    const federal = (base.processo.split(".")[2]||"") === "4";
+    const ref = g.cj || g.revisor || g.executor || base;
+    demandas.push({
+      key: tarefasG.map(t=>t.id).sort().join("+"),
+      ids: [...tarefasG, g.cj].filter(Boolean).map(t=>t.id),
+      cliente: base.cliente, processo: base.processo, pasta: base.pasta,
+      desc: (g.executor||base).desc.replace(/\s*\(?\s*(executor|revisor)\s*\)?/i,""),
+      executor: g.executor, revisor: g.revisor, cj: g.cj, outros: g.outros,
+      fatal: somarUteis(ref.venc, D_MENOS, federal),
+      origemFatal: g.cj ? "tarefa Acompanhamento CJ" : g.revisor ? "tarefa do revisor" : g.executor ? "tarefa do executor" : "tarefa do L.O.",
+      lo: g.executor ? g.executor.venc : null, revisao: g.revisor ? g.revisor.venc : null,
+    });
+  }
+  return demandas.sort((a,b)=>a.fatal.localeCompare(b.fatal));
+}
+
+// ---------------------------------------------------------------- Programação (só leitura)
+let prog = null;  // {semana: nome da aba, linhas: [{cliente,natureza,caso,fatal}]}
+function lerProgramacao(texto){
+  const linhas = texto.split(/\r?\n/);
+  const abas = linhas.filter(l=>l.startsWith("## Sheet: W")).map(l=>l.slice(10).split(" — ")[0]);
+  const todas = [];
+  for (const aba of abas.slice(0,6)){
+    const s = secao(texto, aba); if (!s) continue;
+    const c = n => s.cab.indexOf(n);
+    for (const l of s.linhas) todas.push({aba, cliente:(l[c("cliente")]||"").trim(), natureza:(l[c("natureza")]||"").trim(),
+      caso:(l[c("caso")]||"").trim(), fatal: fromBr(l[c("fatal")]||""), texto: l.join(" ")});
+  }
+  return {semana: abas[0]||"", linhas: todas};
+}
+const digitos = s => (s||"").replace(/\D/g,"");
+function naProgramacao(d){
+  if (!prog || !d.processo) return null;
+  const alvo = digitos(d.processo); if (alvo.length < 10) return null;
+  return prog.linhas.find(l => digitos(l.texto).includes(alvo)) || null;
+}
+function jaNaSemana(d){
+  if (!prog || !d.processo) return false;
+  const alvo = digitos(d.processo);
+  return prog.linhas.some(l => l.aba===prog.semana && l.fatal===d.fatal && digitos(l.texto).includes(alvo));
+}
+
+// ---------------------------------------------------------------- estado e capacidades
+let mcp = null, db = null;
+let demandas = [], atribuicoes = [], ignoradas = new Set(), aberto = null;
+const $ = id => document.getElementById(id);
+const esc = s => String(s??"").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function aviso(msg, erro){ const a = $("aviso"); a.hidden = !msg; a.className = "banner"+(erro?" err":""); a.textContent = msg||""; }
+function msgMcp(e){
+  const c = e && e.code;
+  if (c==="needs_reauth") return "Reconecte o Microsoft 365 em claude.ai → Configurações → Conectores.";
+  if (c==="server_not_connected" || c==="selection_required") return "Adicione ou escolha o conector Microsoft 365 em claude.ai → Configurações → Conectores.";
+  if (c==="not_in_manifest" || c==="consent_required" || c==="approval_required") return "Esta página precisa da sua permissão para ler o OneDrive. Toque em Permissões no menu do artifact.";
+  if (c==="tool_error") return "O OneDrive respondeu com erro: "+(e.message||"");
+  return "Não consegui falar com o Microsoft 365 agora ("+(c||"erro")+"). Tente recarregar em instantes.";
+}
+async function ler(uri){
+  const r = await mcp.callTool(M365, "read_resource", {uri});
+  if (typeof r.payload === "string") return r.payload;
+  const t = (r.content||[]).find(b=>b.type==="text"); return t ? t.text : JSON.stringify(r.payload);
+}
+
+async function carregarLO(){
+  const agora = new Date();
+  const candidatos = [0,-1].map(n => { const d = new Date(agora.getFullYear(), agora.getMonth()+n, 1); return `Tarefas_Pendentes_LegalOne_${MESES[d.getMonth()]}-${d.getFullYear()}.xlsx`; });
+  let ultimoErro = null;
+  for (const nome of candidatos){
+    try {
+      const texto = await ler(`file:///${DRIVE}/${nome}`);
+      if (!texto.includes("## Sheet:")) { ultimoErro = {code:"tool_error", message:"arquivo sem planilhas"}; continue; }
+      const base = (/Data base:\s*(\d{2}\/\d{2}\/\d{4})/.exec(texto)||[])[1];
+      $("fonte").textContent = `${nome.replace(".xlsx","")}${base ? " · gerada em "+base : ""}`;
+      return lerTarefas(texto);
+    } catch (e){ ultimoErro = e; if (e.code && e.code!=="tool_error") break; }
+  }
+  throw ultimoErro || new Error("Planilha do L.O. não encontrada.");
+}
+
+// ---------------------------------------------------------------- render
+function urgencia(d){
+  if (d.fatal < hoje) return ["bad","Fatal vencido"];
+  const ateFatal = (fromIso(d.fatal)-fromIso(hoje))/864e5;
+  if (ateFatal <= 3) return ["bad", ateFatal===0?"Fatal hoje":`Fatal em ${ateFatal} dia${ateFatal>1?"s":""}`];
+  if (d.lo && d.lo <= hoje) return ["warn","Prazo LO já chegou"];
+  return null;
+}
+function papelBox(rotulo, t){
+  if (!t) return `<div class="role"><span>${rotulo}</span>sem tarefa no L.O.</div>`;
+  return `<div class="role"><span>${rotulo} · ${br(t.venc)}</span>${esc(t.resp||"–")}</div>`;
+}
+function cardFila(d){
+  const u = urgencia(d), ja = jaNaSemana(d);
+  return `<article class="card ${u&&u[0]==="bad"?"urg":u?"soon":""}" data-key="${esc(d.key)}">
+    <div class="top">
+      <div class="cli">${esc(d.cliente||"Sem vínculo")}</div>
+      <div class="fatal"><small>Fatal</small><b>${br(d.fatal)}</b><small>${DIAS[fromIso(d.fatal).getDay()]}</small></div>
+    </div>
+    <div class="prov">${esc(d.desc)}</div>
+    <div class="meta">${d.pasta?`<span class="mono">${esc(d.pasta)}</span>`:""}${d.processo?`<span class="mono">${esc(d.processo)}</span>`:""}
+      ${u?`<span class="pill ${u[0]}">${u[1]}</span>`:""}${ja?`<span class="pill ok">Já na aba ${esc(prog.semana)}</span>`:""}</div>
+    <div class="roles">${papelBox("Executor",d.executor)}${papelBox("Revisor",d.revisor)}</div>
+    <div class="note">Fatal estimado: ${d.origemFatal} + ${D_MENOS} dias úteis. Confira antes de confirmar.</div>
+    ${aberto===d.key ? formulario(d) : `<div class="actions"><button class="b pri" data-acao="abrir">Atribuir</button><button class="b" data-acao="ignorar">${ja?"Já está na Programação":"Ignorar"}</button></div>`}
+  </article>`;
+}
+function chips(nome, sel){
+  return `<div class="chips" role="group">${EQUIPE.map(p=>`<button type="button" class="chipbtn" data-campo="${nome}" data-valor="${p}" aria-pressed="${sel===p}">${p}</button>`).join("")}
+    ${nome==="revisor"?`<button type="button" class="chipbtn" data-campo="revisor" data-valor="" aria-pressed="${!sel}">Sem revisor</button>`:""}</div>`;
+}
+function formulario(d){
+  const p = naProgramacao(d) || {};
+  return `<form class="f" data-key="${esc(d.key)}" novalidate>
+    <div class="field"><span class="lbl">Executor</span>${chips("executor","")}</div>
+    <div class="field"><span class="lbl">Revisor</span>${chips("revisor","")}</div>
+    <div class="grid3">
+      <label class="field"><span class="lbl">Prazo LO</span><input type="date" id="f-lo" value="${d.lo||""}"></label>
+      <label class="field"><span class="lbl">Revisão</span><input type="date" id="f-rev" value="${d.revisao||""}"></label>
+      <label class="field"><span class="lbl">Fatal</span><input type="date" id="f-fatal" value="${d.fatal}" required></label>
+    </div>
+    <details><summary>Dados para a Programação</summary>
+      <div class="grid3" style="margin-top:8px">
+        <label class="field"><span class="lbl">Cliente</span><input id="f-cli" value="${esc(p.cliente||d.cliente)}"></label>
+        <label class="field"><span class="lbl">Natureza</span><input id="f-nat" value="${esc(p.natureza||"Contencioso")}"></label>
+        <label class="field"><span class="lbl">Prioridade</span><select id="f-pri">${["Alta","Média","Baixa","Acompanhamento"].map(x=>`<option>${x}</option>`).join("")}</select></label>
+      </div>
+      <label class="field" style="margin-top:8px"><span class="lbl">Caso</span><input id="f-caso" value="${esc(p.caso||d.processo||d.pasta)}"></label>
+      <label class="field" style="margin-top:8px"><span class="lbl">Providência</span><input id="f-prov" value="${esc(d.desc.slice(0,160))}"></label>
+    </details>
+    <label class="field"><span class="lbl">Observações</span><textarea id="f-obs"></textarea></label>
+    <div class="actions"><button class="b pri" type="submit">Confirmar atribuição</button><button class="b" type="button" data-acao="fechar">Cancelar</button></div>
+    <div class="note" id="f-msg"></div>
+  </form>`;
+}
+function textoAndamento(a){ return a.revisor ? `${AUTOR} - Novo Fluxo: Executor: ${a.executor}, Revisor: ${a.revisor}.` : `${AUTOR} - Novo Fluxo: Executor: ${a.executor}.`; }
+function cardFeita(a){
+  const t = (campo, rot) => `<button class="toggle" data-id="${esc(a.__id)}" data-campo="${campo}" aria-pressed="${!!a[campo]}">${a[campo]?"✓ ":""}${rot}</button>`;
+  const pend = !(a.programacao && a.agenda && a.andamento);
+  return `<article class="card">
+    <div class="top"><div class="cli">${esc(a.cliente)}</div>
+      <div class="fatal"><small>Fatal</small><b>${br(a.fatal)}</b></div></div>
+    <div class="prov">${esc(a.providencia)}</div>
+    <div class="meta">${a.pasta?`<span class="mono">${esc(a.pasta)}</span>`:""}${a.processo?`<span class="mono">${esc(a.processo)}</span>`:""}
+      <span>LO ${br(a.lo)}</span>${a.revisao?`<span>Revisão ${br(a.revisao)}</span>`:""}<span>${pend?'<span class="pill warn">Pendente no computador</span>':'<span class="pill ok">Concluída</span>'}</span></div>
+    <div class="roles"><div class="role"><span>Executor</span>${esc(a.executor)}</div><div class="role"><span>Revisor</span>${esc(a.revisor||"sem revisor")}</div></div>
+    <div class="andam" id="and-${esc(a.__id)}">${esc(a.andamento_texto)}</div>
+    <div class="status">${t("programacao","Programação")}${t("agenda","Outlook")}${t("andamento","Andamento L.O.")}
+      <button class="toggle" data-copiar="${esc(a.__id)}">Copiar andamento</button></div>
+  </article>`;
+}
+function render(){
+  const tratadas = new Set([...ignoradas, ...atribuicoes.flatMap(a=>a.tarefas||[])]);
+  const fila = demandas.filter(d => !d.ids.some(id=>tratadas.has(id)) && d.fatal >= somarUteis(hoje,-5,false));
+  $("n-fila").textContent = fila.length; $("n-feitas").textContent = atribuicoes.filter(a=>!(a.programacao&&a.agenda&&a.andamento)).length;
+  $("fila").innerHTML = fila.length ? fila.map(cardFila).join("") :
+    `<div class="empty">${demandas.length?"Todos os prazos desta planilha já foram atribuídos ou ignorados.":"Nenhum prazo encontrado na planilha do L.O."}</div>`;
+  const feitas = [...atribuicoes].sort((a,b)=>(b.criado||"").localeCompare(a.criado||""));
+  $("feitas").innerHTML = feitas.length ? feitas.map(cardFeita).join("") :
+    `<div class="empty">Nenhuma atribuição ainda. Atribua um prazo na aba "A atribuir".</div>`;
+}
+
+// ---------------------------------------------------------------- eventos
+function mostrarAba(qual){
+  $("tab-fila").setAttribute("aria-selected", qual==="fila"); $("tab-feitas").setAttribute("aria-selected", qual==="feitas");
+  $("fila").hidden = qual!=="fila"; $("feitas").hidden = qual!=="feitas";
+  try{ localStorage.setItem("aba", qual); }catch{}
+}
+$("tab-fila").onclick = () => mostrarAba("fila");
+$("tab-feitas").onclick = () => mostrarAba("feitas");
+
+$("fila").addEventListener("click", async ev => {
+  const b = ev.target.closest("button"); if (!b) return;
+  const card = b.closest("[data-key]"); const d = card && demandas.find(x=>x.key===card.dataset.key); if (!d) return;
+  if (b.dataset.campo){
+    b.parentElement.querySelectorAll(".chipbtn").forEach(x=>x.setAttribute("aria-pressed", x===b));
+    if (b.dataset.campo==="revisor"){ const rev = card.querySelector("#f-rev"); if (rev && !b.dataset.valor) rev.value = ""; else if (rev && !rev.value) rev.value = d.revisao || somarUteis(d.fatal,-1,false); }
+    return;
+  }
+  if (b.dataset.acao==="abrir"){ aberto = d.key; render(); document.querySelector(`[data-key="${CSS.escape(d.key)}"]`)?.scrollIntoView({block:"start",behavior:"smooth"}); }
+  if (b.dataset.acao==="fechar"){ aberto = null; render(); }
+  if (b.dataset.acao==="ignorar"){
+    if (!db) return aviso("Sem acesso ao armazenamento da página; não dá para registrar.", true);
+    b.disabled = true;
+    try { for (const id of d.ids) await db.doc(`ignoradas/${id}`).set({em:new Date().toISOString(), cliente:d.cliente, desc:d.desc.slice(0,120)}); }
+    catch(e){ b.disabled=false; aviso("Não consegui registrar: "+(e.message||e.code), true); }
+  }
+});
+
+$("fila").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const f = ev.target, d = demandas.find(x=>x.key===f.dataset.key); if (!d) return;
+  const sel = c => (f.querySelector(`.chipbtn[data-campo="${c}"][aria-pressed="true"]`)||{}).dataset?.valor || "";
+  const executor = sel("executor"), revisor = sel("revisor");
+  const msg = f.querySelector("#f-msg");
+  const fatal = f.querySelector("#f-fatal").value;
+  if (!executor) { msg.textContent = "Escolha o executor."; return; }
+  if (!fatal) { msg.textContent = "Informe o fatal."; return; }
+  if (!db) { msg.textContent = "Sem acesso ao armazenamento da página."; return; }
+  const a = {
+    criado: new Date().toISOString(), tarefas: d.ids,
+    cliente: f.querySelector("#f-cli").value.trim(), natureza: f.querySelector("#f-nat").value.trim(),
+    caso: f.querySelector("#f-caso").value.trim(), providencia: f.querySelector("#f-prov").value.trim(),
+    prioridade: f.querySelector("#f-pri").value, observacoes: f.querySelector("#f-obs").value.trim(),
+    processo: d.processo, pasta: d.pasta, executor, revisor,
+    lo: f.querySelector("#f-lo").value || null, revisao: revisor ? (f.querySelector("#f-rev").value || null) : null, fatal,
+    resp_lo_executor: d.executor?.resp || "", resp_lo_revisor: d.revisor?.resp || "",
+    programacao: false, agenda: false, andamento: false,
+  };
+  a.andamento_texto = textoAndamento(a);
+  f.querySelector('button[type="submit"]').disabled = true; msg.textContent = "Registrando…";
+  try { await db.doc(`atribuicoes/${d.ids[0]}`).set(a); aberto = null; }
+  catch(e){ f.querySelector('button[type="submit"]').disabled = false; msg.textContent = "Não consegui registrar: "+(e.message||e.code); }
+});
+
+$("feitas").addEventListener("click", async ev => {
+  const b = ev.target.closest("button"); if (!b) return;
+  if (b.dataset.copiar){
+    const el = $("and-"+b.dataset.copiar), txt = el.textContent;
+    try { await navigator.clipboard.writeText(txt); b.textContent = "Copiado"; }
+    catch { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); b.textContent = "Selecionado"; }
+    return;
+  }
+  if (b.dataset.id && db){
+    const novo = b.getAttribute("aria-pressed")!=="true"; b.disabled = true;
+    try { await db.doc(`atribuicoes/${b.dataset.id}`).update({[b.dataset.campo]: novo}); }
+    catch(e){ aviso("Não consegui atualizar: "+(e.message||e.code), true); }
+    b.disabled = false;
+  }
+});
+
+// ---------------------------------------------------------------- início
+(async () => {
+  try{ if (localStorage.getItem("aba")==="feitas") mostrarAba("feitas"); }catch{}
+  const [m, d] = await Promise.all([claude.use("mcp"), claude.use("db")]);
+  mcp = m; db = d;
+  if (db){
+    db.collection("atribuicoes").onSnapshot(s => { atribuicoes = s.docs.map(x => ({...x.data(), __id: x.id})); render(); });
+    db.collection("ignoradas").onSnapshot(s => { ignoradas = new Set(s.docs.map(x=>x.id)); render(); });
+  } else aviso("Abra esta página logado no claude.ai para registrar atribuições.", true);
+  if (!mcp){ $("fonte").textContent = "Conector indisponível nesta visualização."; aviso("Abra esta página no app do Claude, logado na sua conta, para ler o OneDrive.", true); return; }
+  try { demandas = agrupar(await carregarLO()); render(); }
+  catch(e){ $("fonte").textContent = "Planilha do L.O. não carregada."; aviso(msgMcp(e), true); render(); return; }
+  try { prog = lerProgramacao(await ler(PROGRAMACAO)); render(); } catch { /* a Programação só melhora os padrões; segue sem ela */ }
+})();
+</script>

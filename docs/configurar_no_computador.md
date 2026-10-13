@@ -1,9 +1,13 @@
-# Configuração no computador da Betina (Claude Desktop / Cowork)
+# Configuração no computador da rotina (Claude Desktop / Cowork)
 
-As tarefas agendadas que usam o Claude in Chrome rodam no Claude Desktop do
-computador (Windows) e só podem ser criadas ou alteradas por lá. Abra uma
-conversa do **Cowork nesse computador** e cole a mensagem abaixo, inteira.
-O Claude de lá vai pedir sua aprovação para cada alteração.
+As tarefas que usam o Claude in Chrome rodam no Claude Desktop do computador
+e só podem ser criadas ou alteradas por lá. Abra uma conversa do **Cowork
+nesse computador** e cole a mensagem abaixo, inteira.
+
+O dia a dia fica assim: no celular, a página **Atribuição de Prazos**
+(https://claude.ai/artifact/CepueKNa5EUT6FYxjoCyTY) lê a planilha do L.O. no
+seu OneDrive e você escolhe executor e revisor; no computador, a tarefa
+"Aplicar atribuições do celular" grava na Programação, no Outlook e no L.O.
 
 ---
 
@@ -34,22 +38,22 @@ Passo a passo:
 8. Ao final, apresente um resumo em texto: quantos itens estão vencidos, quantos vencem hoje, quantos a vencer (separando os do mês corrente dos meses seguintes) e qual responsável concentra mais pendências.
 <<<FIM DO TEXTO 1>>>
 
-2) CRIE uma nova tarefa chamada "Andamentos de fluxo no L.O.", neste computador, SEM agendamento (vou rodar manualmente, depois de atribuir os prazos), com acesso ao Claude in Chrome e à pasta C:\Users\Betina\Downloads, com este texto:
+2) CRIE uma nova tarefa chamada "Aplicar atribuições do celular", neste computador, agendada para dias úteis às 18h (e que eu também possa rodar manualmente), com acesso ao Claude in Chrome, com este texto:
 
 <<<INÍCIO DO TEXTO 2>>>
-Lance no Legal One os andamentos de ajuste de fluxo (novo executor/revisor) registrados hoje.
+Aplique no computador as atribuições de prazo feitas pelo celular.
 
-1. Leia C:\Users\Betina\Downloads\Atribuicoes_<data de hoje AAAA-MM-DD>.xlsx (aba "Atribuições"). Considere só as linhas com "Andamento lançado" = "Não". Se o arquivo não existir ou não houver linhas pendentes, informe e encerre.
-2. Mostre a lista (Pasta L.O., Cliente, Processo, Executor, Revisor, Fatal, Texto do andamento) e PEÇA CONFIRMAÇÃO antes de lançar qualquer andamento.
-3. Abra https://charneskiadvogados.novajus.com.br no navegador local (Claude in Chrome). A sessão normalmente já está autenticada como Pedro Delapieve; se pedir login, avise e aguarde.
-4. Para cada linha confirmada:
-   a. Abra o processo pela pasta (coluna "Pasta L.O.", ex.: RAUL-JUD-AO-01); se estiver vazia, pesquise pelo número do processo. Confira no cabeçalho "Visualizando processo" que o Número e as Partes batem com o Processo e o Cliente da planilha. Se não bater, NÃO lance — registre a divergência e passe para a próxima.
-   b. Antes de lançar, olhe os andamentos mais recentes da pasta: se já existir um andamento com o mesmo texto lançado hoje, não duplique — apenas marque como lançado.
-   c. Vá na aba "Andamentos" → botão "Adicionar". Tipo: "Andamento". Data: hoje. Descrição: exatamente o texto da coluna "Texto do andamento" (ex.: "PEDRO - Novo Fluxo: Executor: Danieli, Revisor: Pedro."). Não preencha outros campos além dos obrigatórios e salve.
-   d. Não altere tarefas, responsáveis nem prazos — apenas crie o andamento. A controladoria faz a redistribuição a partir dele.
-   e. Confira que o andamento aparece no topo da lista de andamentos da pasta.
-5. Atualize a planilha: "Andamento lançado" = "Sim" nas linhas lançadas e salve no mesmo lugar (use o skill xlsx). Se o arquivo estiver aberto e não puder ser salvo, informe quais linhas foram lançadas.
-6. Responda com um resumo: quantos andamentos lançados, quais pastas e quais falharam e por quê.
+FONTE: a página https://claude.ai/artifact/CepueKNa5EUT6FYxjoCyTY, coleção "atribuicoes". Leia-a com a ferramenta ArtifactData (action "list", collection "atribuicoes"). Se essa ferramenta não estiver disponível, abra a página no Chrome, vá na aba "Atribuídos" e leia os cartões marcados "Pendente no computador".
+Cada atribuição traz: cliente, natureza, caso, providencia, prioridade, observacoes, processo, pasta, executor, revisor, lo, revisao, fatal (datas AAAA-MM-DD), andamento_texto e três marcadores: programacao, agenda, andamento (true = já feito).
+
+Considere só as atribuições com algum marcador false. Mostre a lista e PEÇA CONFIRMAÇÃO antes de gravar qualquer coisa. Depois, para cada uma:
+
+1. PROGRAMAÇÃO (se programacao = false): abra no Chrome, no Excel para a Web, https://charneskiadvogados.sharepoint.com/sites/CharneskiAdvogados_Drive2/Documentos%20Partilhados/JOBS/Programa%C3%A7%C3%A3o%202026.xlsx . Use a PRIMEIRA aba (semana corrente, padrão "W## ddmmaaaa"). Se já existir linha com o mesmo processo e o mesmo Fatal, não duplique — só marque como feito. Senão, insira uma linha na posição que mantém a ordem por "Prazo LO" (linhas "sine die" ou sem data ficam no fim) e preencha: Cliente, Natureza, Caso, Providência, Prazo LO, Revisão, Fatal (DD/MM/AAAA), Executor, Revisor, Prioridade, Status vazio, Observações. Na coluna Vencimento copie a fórmula da linha de cima (ajustando a linha). Confira que a linha ficou certa.
+2. OUTLOOK (se agenda = false): no Outlook na Web (Chrome), crie dois compromissos de dia inteiro, marcados como "livre": "[Prazo LO] <cliente> - <providência> (<processo>)" na data lo e "[FATAL] <cliente> - <providência> (<processo>)" na data fatal, com executor, revisor e as três datas no corpo. Sem convidados.
+3. ANDAMENTO NO L.O. (se andamento = false): em https://charneskiadvogados.novajus.com.br abra o processo pela pasta (campo pasta, ex.: RAUL-JUD-AO-01; se vazio, pelo número do processo) e confira no cabeçalho que número e partes batem. Se não baterem, não lance e registre a divergência. Senão: aba "Andamentos" → "Adicionar", tipo "Andamento", data de hoje, descrição exatamente igual a andamento_texto (ex.: "PEDRO - Novo Fluxo: Executor: Danieli, Revisor: Pedro."). Antes, veja se o mesmo texto já foi lançado hoje na pasta; se foi, não duplique. Não altere tarefas, responsáveis nem prazos.
+4. Depois de cada passo concluído, marque o marcador correspondente como true: com ArtifactData (action "update", collection "atribuicoes", doc_id da atribuição, data {"programacao": true} etc., passando o if_version lido) ou, pela página no Chrome, tocando no botão "Programação", "Outlook" ou "Andamento L.O." do cartão.
+
+Ao final, responda com um resumo: o que foi aplicado, o que falhou e por quê.
 <<<FIM DO TEXTO 2>>>
 
 Não execute nenhuma das duas tarefas agora; só salve.

@@ -1,5 +1,30 @@
 # Controller – atribuição de prazos do Legal One
 
+## Uso pelo celular (recomendado)
+
+A página **Atribuição de Prazos** (https://claude.ai/artifact/CepueKNa5EUT6FYxjoCyTY,
+fonte em [`celular/atribuicao.html`](celular/atribuicao.html)) abre no app do
+Claude no celular e usa o conector do Microsoft 365 que já está ligado à sua
+conta — não precisa registrar app na Microsoft.
+
+1. Lê a planilha da rotina "Prazos do Mês no L.O." no seu OneDrive
+   (`Tarefas_Pendentes_LegalOne_<Mês>-<Ano>.xlsx`).
+2. Junta a tarefa do executor, a do revisor e o "Acompanhamento CJ" de cada
+   prazo; fatal = data do Acompanhamento CJ (ou do revisor) + 2 dias úteis.
+3. Você escolhe executor e revisor (e ajusta datas e dados da Programação);
+   a atribuição fica guardada na própria página, com o texto do andamento
+   (`PEDRO - Novo Fluxo: Executor: X, Revisor: Y.`).
+4. No computador da rotina, a tarefa "Aplicar atribuições do celular" grava na
+   Programação (Excel para a Web), no Outlook e no L.O. pelo Claude in Chrome,
+   e marca cada passo como feito na página.
+
+O conector do Microsoft 365 desta conta só tem permissão de leitura; por isso
+as gravações ficam no computador. Para configurar as tarefas, cole a mensagem
+de [`docs/configurar_no_computador.md`](docs/configurar_no_computador.md) numa
+conversa do Cowork nesse computador.
+
+## App de linha de comando (alternativa no computador)
+
 App de linha de comando que:
 
 1. lê a planilha gerada todo dia útil pela rotina **"Prazos do Mês no L.O."**
@@ -60,7 +85,7 @@ A planilha `Atribuicoes_<data>.xlsx` é o resumo do dia para a controladoria.
 O texto do andamento segue o padrão do escritório
 (`PEDRO - Novo Fluxo: Executor: Danieli, Revisor: Pedro.`). Para lançá-los
 automaticamente pelo Claude in Chrome, use a tarefa descrita em
-[`docs/rotina_andamentos_LO.md`](docs/rotina_andamentos_LO.md).
+[`docs/rotina_aplicar_atribuicoes.md`](docs/rotina_aplicar_atribuicoes.md).
 
 ## Instalação
 
