@@ -40,6 +40,13 @@ Revisor: 1
   ✔ Atribuição registrada para o andamento no L.O.
 ```
 
+## Configuração no Claude Desktop
+
+As rotinas que usam o Claude in Chrome (extração do L.O. e lançamento dos
+andamentos) só podem ser criadas ou alteradas no computador onde rodam. Cole a
+mensagem de [`docs/configurar_no_computador.md`](docs/configurar_no_computador.md)
+numa conversa do Cowork nesse computador.
+
 ## Rotina do L.O.
 
 O app lê o formato atual da planilha, mas funciona melhor com a versão
