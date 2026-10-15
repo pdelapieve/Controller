@@ -17,9 +17,9 @@ Como fica o dia a dia:
 ---
 
 ````text
-Preciso de três alterações nas minhas tarefas agendadas. Peça minha aprovação antes de salvar cada uma e, ao final, me mostre como ficou.
+Preciso de quatro alterações nas minhas tarefas agendadas. Peça minha aprovação antes de salvar cada uma e, ao final, me mostre como ficou.
 
-1) ALTERE a tarefa agendada existente "Prazos do Mês no L.O." (não apague nem recrie; mantenha o horário atual, dias úteis às 17h). Substitua o texto (prompt) dela inteiramente por este:
+1) ALTERE a tarefa agendada existente "Prazos do Mês no L.O." (não apague nem recrie; mantenha o horário atual, dias úteis às 17h). Substitua o texto (prompt) dela inteiramente por este, e dê a ela acesso às pastas C:\Users\Betina\Downloads e C:\Users\Betina\OneDrive - Charneski Advogados (1):
 
 <<<INÍCIO DO TEXTO 1>>>
 Extraia as tarefas pendentes do Legal One (mês corrente e próximos 60 dias) e gere a planilha de controle.
@@ -39,11 +39,11 @@ Passo a passo:
    - Tipo = tipo/subtipo da tarefa como aparece no L.O. (é ele que indica se a tarefa é de execução ou de revisão).
    - Tarefa = descrição completa.
    Ordene por data, com cores por status, filtro e painéis congelados; e uma aba "Resumo" com contagens por status e por responsável (usando COUNTIF/COUNTIFS, não valores fixos). Rode o recálculo do skill xlsx antes de entregar.
-7. Nomeie o arquivo Tarefas_Pendentes_LegalOne_<Mês>-<Ano>.xlsx (mês/ano de hoje), entregue com SendUserFile e salve também em C:\Users\Betina\Downloads via device_commit_files, substituindo o arquivo do mesmo nome (se a pasta não estiver conectada, peça acesso com device_request_folder_access). Este arquivo é lido pelo app de atribuição de prazos — mantenha exatamente o nome, a aba e as colunas acima.
+7. Nomeie o arquivo Tarefas_Pendentes_LegalOne_<Mês>-<Ano>.xlsx (mês/ano de hoje), entregue com SendUserFile e salve via device_commit_files, substituindo o arquivo do mesmo nome, em DOIS lugares: (a) C:\Users\Betina\Downloads e (b) a RAIZ do OneDrive de pedro@charneski.com.br — a pasta C:\Users\Betina\OneDrive - Charneski Advogados (1) (a mesma que contém a subpasta Snapshot), não numa subpasta. Se uma pasta não estiver conectada, peça acesso com device_request_folder_access. A cópia da raiz do OneDrive é a que a página "Atribuição de Prazos" do celular lê — mantenha exatamente o nome, a aba e as colunas acima, e confira ao final que o arquivo da raiz do OneDrive ficou com a data de hoje.
 8. Ao final, apresente um resumo em texto: quantos itens estão vencidos, quantos vencem hoje, quantos a vencer (separando os do mês corrente dos meses seguintes) e qual responsável concentra mais pendências.
 <<<FIM DO TEXTO 1>>>
 
-2) CRIE uma nova tarefa chamada "Atribuir prazos", neste computador, SEM agendamento (eu rodo manualmente), com acesso ao Claude in Chrome e à pasta C:\Users\Betina\Downloads, com este texto:
+2) CRIE uma nova tarefa chamada "Atribuir prazos", neste computador, SEM agendamento (eu rodo manualmente), com acesso ao Claude in Chrome e às pastas C:\Users\Betina\Downloads e C:\Users\Betina\OneDrive - Charneski Advogados (1), com este texto:
 
 <<<INÍCIO DO TEXTO 2>>>
 Vamos atribuir executor e revisor aos prazos do Legal One e aplicar as atribuições. Fale em português, de forma objetiva.
@@ -96,6 +96,8 @@ Considere só as atribuições com algum marcador false. Mostre a lista e PEÇA 
 
 Ao final, responda com um resumo: o que foi aplicado, o que falhou e por quê.
 <<<FIM DO TEXTO 3>>>
+
+4) DESATIVE a tarefa "Andamentos de fluxo no L.O." (ela procura um arquivo Atribuicoes_<data>.xlsx que não é mais gerado; a tarefa 3 substitui ela).
 
 Não execute nenhuma das tarefas agora; só salve.
 ````

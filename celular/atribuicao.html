@@ -154,12 +154,17 @@ function secao(texto, nomeAba){
   return {nome, cab: (out[0]||[]).map(c=>c.trim().toLowerCase()), linhas: out.slice(1)};
 }
 
-function papelDe(desc){
-  if (/acompanhamento\s+cj/i.test(desc)) return "cj";
-  const m = /\(?\s*(executor|revisor)\s*\)?/i.exec(desc);
-  return m ? m[1].toLowerCase() : "outro";
+// Papel da tarefa: pela coluna Tipo do L.O. ("... - Revisão", "Acompanhamento Controladoria
+// Jurídica") e pela marcação na descrição, que às vezes vem com erro de digitação ("revidor").
+const MARCA = /\(?\s*\b(executor|revisor|revidor)\b\s*\)?/i;
+function papelDe(tipo, desc){
+  if (/acompanhamento\s+(cj|controladoria)/i.test(tipo+" "+desc)) return "cj";
+  const m = MARCA.exec(desc);
+  if (m) return m[1].toLowerCase()==="executor" ? "executor" : "revisor";
+  if (/revis[aã]o/i.test(tipo)) return "revisor";
+  return "outro";
 }
-const semPapel = desc => desc.replace(/\(?\s*(executor|revisor)\s*\)?/ig," ").replace(/[^\p{L}\p{N}]+/gu," ").trim().toLowerCase();
+const semPapel = desc => desc.replace(new RegExp(MARCA.source,"ig")," ").replace(/[^\p{L}\p{N}]+/gu," ").trim().toLowerCase();
 const eventoDe = desc => (/(eventos?\s+[\d\sae]+|ID\s*\d+)/i.exec(desc)||[""])[0].replace(/\s+/g," ").trim().toLowerCase();
 
 function lerTarefas(texto){
@@ -189,7 +194,7 @@ function lerTarefas(texto){
     return {
       id: g(iId) || hash([cp||cliente+processo, desc, venc].join("|")),
       venc, resp: g(iResp), cliente, processo, pasta, desc, tipo,
-      papel: papelDe(tipo+" "+desc),
+      papel: papelDe(tipo, desc),
     };
   }).filter(Boolean);
 }
@@ -222,7 +227,7 @@ function agrupar(tarefas){
       key: tarefasG.map(t=>t.id).sort().join("+"),
       ids: [...tarefasG, g.cj].filter(Boolean).map(t=>t.id),
       cliente: base.cliente, processo: base.processo, pasta: base.pasta,
-      desc: (g.executor||base).desc.replace(/\s*\(?\s*(executor|revisor)\s*\)?/i,""),
+      desc: (g.executor||base).desc.replace(MARCA,"").replace(/\s{2,}/g," "),
       executor: g.executor, revisor: g.revisor, cj: g.cj, outros: g.outros,
       fatal: somarUteis(ref.venc, D_MENOS, federal),
       origemFatal: g.cj ? "tarefa Acompanhamento CJ" : g.revisor ? "tarefa do revisor" : g.executor ? "tarefa do executor" : "tarefa do L.O.",
@@ -329,8 +334,11 @@ async function carregarLO(){
   const arq = lista[0];
   const texto = await ler(arq.uri);
   if (!texto.includes("## Sheet:")) throw {code:"tool_error", message:`${arq.nome} veio sem planilhas.`};
-  const base = (/Data base:\s*(\d{2}\/\d{2}\/\d{4})/.exec(texto)||[])[1];
-  $("fonte").textContent = `${arq.nome.replace(".xlsx","")}${base ? " · gerada em "+base : ""}`;
+  const ref = fromBr((/Data (?:base|de refer[êe]ncia):\s*(\d{2}\/\d{2}\/\d{4})/i.exec(texto)||[])[1]);
+  $("fonte").textContent = `${arq.nome.replace(".xlsx","")}${ref ? " · dados de "+br(ref) : ""}`;
+  const ultimoUtil = util(fromIso(hoje), false) ? hoje : somarUteis(hoje, -1, false);
+  if (ref && ref < somarUteis(ultimoUtil, -1, false))
+    aviso(`A planilha do L.O. é de ${br(ref)}. A rotina "Prazos do Mês no L.O." não a atualizou desde então; prazos cadastrados depois disso ainda não aparecem aqui.`);
   return lerTarefas(texto);
 }
 
