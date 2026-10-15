@@ -68,6 +68,8 @@ textarea{min-height:60px;resize:vertical}
 .toggle{border:1px solid var(--line);border-radius:999px;padding:6px 10px;font:600 .78rem var(--f-body);cursor:pointer;background:var(--surface);color:var(--muted)}
 .toggle[aria-pressed="true"]{background:var(--ok-bg);border-color:var(--ok);color:var(--ok)}
 .andam{font-family:var(--f-mono);font-size:.8rem;background:var(--chip);border-radius:8px;padding:8px;overflow-wrap:anywhere;user-select:all}
+.japrog{display:flex;flex-direction:column;gap:10px;margin-top:8px;padding:14px;border:1px dashed var(--line);border-radius:12px;background:var(--surface)}
+.japrog .linha{display:flex;flex-direction:column;gap:4px;padding-top:10px;border-top:1px solid var(--line);min-width:0}
 details summary{cursor:pointer;color:var(--muted);font-size:.85rem}
 @media (prefers-reduced-motion:no-preference){.card{transition:border-color .15s}}
 </style>
@@ -247,7 +249,8 @@ function lerProgramacao(texto){
     const s = secao(texto, aba); if (!s) continue;
     const c = n => s.cab.indexOf(n);
     for (const l of s.linhas) todas.push({aba, cliente:(l[c("cliente")]||"").trim(), natureza:(l[c("natureza")]||"").trim(),
-      caso:(l[c("caso")]||"").trim(), fatal: fromBr(l[c("fatal")]||""), texto: l.join(" ")});
+      caso:(l[c("caso")]||"").trim(), fatal: fromBr(l[c("fatal")]||""), lo: fromBr(l[c("prazo lo")]||""),
+      executor:(l[c("executor")]||"").trim(), revisor:(l[c("revisor")]||"").trim(), texto: l.join(" ")});
   }
   return {semana: abas[0]||"", linhas: todas};
 }
@@ -257,10 +260,21 @@ function naProgramacao(d){
   const alvo = digitos(d.processo); if (alvo.length < 10) return null;
   return prog.linhas.find(l => digitos(l.texto).includes(alvo)) || null;
 }
+// Um prazo do L.O. "já está na Programação" quando a aba da semana tem uma linha do mesmo
+// processo (ou, sem processo, do mesmo cliente) com fatal até 7 dias de diferença ou o mesmo Prazo LO
+// (o fatal da página é estimado; o da Programação pode ter sido ajustado).
+const dias = (a,b) => Math.abs((fromIso(a)-fromIso(b))/864e5);
+const palavraCliente = d => ((d.cliente || d.desc || "").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().match(/[a-z]{4,}/)||[""])[0];
 function jaNaSemana(d){
-  if (!prog || !d.processo) return false;
-  const alvo = digitos(d.processo);
-  return prog.linhas.some(l => l.aba===prog.semana && l.fatal===d.fatal && digitos(l.texto).includes(alvo));
+  if (!prog) return null;
+  const alvo = digitos(d.processo), chave = palavraCliente(d);
+  return prog.linhas.find(l => {
+    if (l.aba !== prog.semana) return false;
+    const mesmo = alvo.length >= 10 ? digitos(l.texto).includes(alvo)
+      : !!chave && l.cliente.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().includes(chave);
+    if (!mesmo) return false;
+    return (l.fatal && d.fatal && dias(l.fatal, d.fatal) <= 7) || (l.lo && d.lo && l.lo === d.lo);
+  }) || null;
 }
 
 // ---------------------------------------------------------------- estado e capacidades
@@ -355,7 +369,7 @@ function papelBox(rotulo, t){
   return `<div class="role"><span>${rotulo} · ${br(t.venc)}</span>${esc(t.resp||"–")}</div>`;
 }
 function cardFila(d){
-  const u = urgencia(d), ja = jaNaSemana(d);
+  const u = urgencia(d), ja = !!jaNaSemana(d);
   return `<article class="card ${u&&u[0]==="bad"?"urg":u?"soon":""}" data-key="${esc(d.key)}">
     <div class="top">
       <div class="cli">${esc(d.cliente||"Sem vínculo")}</div>
@@ -401,24 +415,41 @@ function textoAndamento(a){ return a.revisor ? `${AUTOR} - Novo Fluxo: Executor:
 function cardFeita(a){
   const t = (campo, rot) => `<button class="toggle" data-id="${esc(a.__id)}" data-campo="${campo}" aria-pressed="${!!a[campo]}">${a[campo]?"✓ ":""}${rot}</button>`;
   const pend = !(a.programacao && a.agenda && a.andamento);
+  const naProg = !a.programacao && jaNaSemana({processo:a.processo, cliente:a.cliente, desc:a.providencia, fatal:a.fatal, lo:a.lo});
   return `<article class="card">
     <div class="top"><div class="cli">${esc(a.cliente)}</div>
       <div class="fatal"><small>Fatal</small><b>${br(a.fatal)}</b></div></div>
     <div class="prov">${esc(a.providencia)}</div>
     <div class="meta">${a.pasta?`<span class="mono">${esc(a.pasta)}</span>`:""}${a.processo?`<span class="mono">${esc(a.processo)}</span>`:""}
-      <span>LO ${br(a.lo)}</span>${a.revisao?`<span>Revisão ${br(a.revisao)}</span>`:""}<span>${pend?'<span class="pill warn">Pendente no computador</span>':'<span class="pill ok">Concluída</span>'}</span></div>
+      <span>LO ${br(a.lo)}</span>${a.revisao?`<span>Revisão ${br(a.revisao)}</span>`:""}<span>${pend?'<span class="pill warn">Pendente no computador</span>':'<span class="pill ok">Concluída</span>'}</span>
+      ${naProg?`<span class="pill ok">Já está na aba ${esc(prog.semana)}: ${esc(naProg.executor||"")}${naProg.revisor?"/"+esc(naProg.revisor):""}</span>`:""}</div>
     <div class="roles"><div class="role"><span>Executor</span>${esc(a.executor)}</div><div class="role"><span>Revisor</span>${esc(a.revisor||"sem revisor")}</div></div>
     <div class="andam" id="and-${esc(a.__id)}">${esc(a.andamento_texto)}</div>
     <div class="status">${t("programacao","Programação")}${t("agenda","Outlook")}${t("andamento","Andamento L.O.")}
       <button class="toggle" data-copiar="${esc(a.__id)}">Copiar andamento</button></div>
+    <div class="actions">${pend?`<button class="b" data-tudo="${esc(a.__id)}">Já está tudo feito</button>`:""}
+      <button class="b" data-excluir="${esc(a.__id)}">Excluir atribuição</button></div>
   </article>`;
 }
 function render(){
   const tratadas = new Set([...ignoradas, ...atribuicoes.flatMap(a=>a.tarefas||[])]);
-  const fila = demandas.filter(d => !d.ids.some(id=>tratadas.has(id)) && d.fatal >= somarUteis(hoje,-5,false));
+  const pendentes = demandas.filter(d => !d.ids.some(id=>tratadas.has(id)) && d.fatal >= somarUteis(hoje,-5,false));
+  const fila = pendentes.filter(d => forcarAbertura.has(d.key) || !jaNaSemana(d)),
+        jaProg = pendentes.filter(d => !forcarAbertura.has(d.key) && jaNaSemana(d));
   $("n-fila").textContent = fila.length; $("n-feitas").textContent = atribuicoes.filter(a=>!(a.programacao&&a.agenda&&a.andamento)).length;
-  $("fila").innerHTML = fila.length ? fila.map(cardFila).join("") :
-    `<div class="empty">${demandas.length?"Todos os prazos desta planilha já foram atribuídos ou ignorados.":"Nenhum prazo encontrado na planilha do L.O."}</div>`;
+  $("fila").innerHTML = (fila.length ? fila.map(cardFila).join("") :
+    `<div class="empty">${demandas.length?"Nenhum prazo novo: os desta planilha já foram atribuídos, ignorados ou já estão na Programação.":"Nenhum prazo encontrado na planilha do L.O."}</div>`)
+    + (jaProg.length ? `<div class="japrog">
+        <div class="top"><div><span class="lbl">Já na Programação · aba ${esc(prog.semana)}</span>
+          <div class="note">${jaProg.length} prazo${jaProg.length>1?"s":""} do L.O. com linha correspondente na aba da semana. Retire da fila para não aparecerem de novo.</div></div>
+          <button class="b" data-acao="retirar-todos">Retirar todos</button></div>
+        ${jaProg.map(d => { const l = jaNaSemana(d); return `<div class="linha" data-key="${esc(d.key)}">
+          <div class="cli">${esc(d.cliente||"Sem vínculo")} <span class="note">· fatal ${br(d.fatal)}</span></div>
+          <div class="note">${esc(d.desc.slice(0,110))}</div>
+          <div class="note">Na Programação: ${esc(l.executor||"sem executor")}${l.revisor?" / "+esc(l.revisor):""} · LO ${br(l.lo)} · fatal ${br(l.fatal)}</div>
+          <div class="actions"><button class="b" data-acao="retirar">Retirar da fila</button><button class="b" data-acao="abrir-mesmo">Atribuir assim mesmo</button></div>
+        </div>`; }).join("")}
+      </div>` : "");
   const feitas = [...atribuicoes].sort((a,b)=>(b.criado||"").localeCompare(a.criado||""));
   $("feitas").innerHTML = feitas.length ? feitas.map(cardFeita).join("") :
     `<div class="empty">Nenhuma atribuição ainda. Atribua um prazo na aba "A atribuir".</div>`;
@@ -433,8 +464,28 @@ function mostrarAba(qual){
 $("tab-fila").onclick = () => mostrarAba("fila");
 $("tab-feitas").onclick = () => mostrarAba("feitas");
 
+async function retirar(lista, motivo){
+  if (!db) return aviso("Sem acesso ao armazenamento da página; não dá para registrar.", true);
+  try { for (const d of lista) for (const id of d.ids)
+    await db.doc(`ignoradas/${id}`).set({em:new Date().toISOString(), cliente:d.cliente, desc:d.desc.slice(0,120), motivo}); }
+  catch(e){ aviso("Não consegui registrar: "+(e.message||e.code), true); }
+}
+let forcarAbertura = new Set();
 $("fila").addEventListener("click", async ev => {
   const b = ev.target.closest("button"); if (!b) return;
+  if (b.dataset.acao==="retirar-todos"){
+    b.disabled = true;
+    const tratadas = new Set([...ignoradas, ...atribuicoes.flatMap(a=>a.tarefas||[])]);
+    await retirar(demandas.filter(d => !d.ids.some(id=>tratadas.has(id)) && jaNaSemana(d)), "já na Programação");
+    return;
+  }
+  const linha = b.closest(".linha");
+  if (linha){
+    const d = demandas.find(x=>x.key===linha.dataset.key); if (!d) return;
+    if (b.dataset.acao==="retirar"){ b.disabled = true; await retirar([d], "já na Programação"); }
+    if (b.dataset.acao==="abrir-mesmo"){ forcarAbertura.add(d.key); aberto = d.key; render(); }
+    return;
+  }
   const card = b.closest("[data-key]"); const d = card && demandas.find(x=>x.key===card.dataset.key); if (!d) return;
   if (b.dataset.campo){
     b.parentElement.querySelectorAll(".chipbtn").forEach(x=>x.setAttribute("aria-pressed", x===b));
@@ -483,6 +534,19 @@ $("feitas").addEventListener("click", async ev => {
     const el = $("and-"+b.dataset.copiar), txt = el.textContent;
     try { await navigator.clipboard.writeText(txt); b.textContent = "Copiado"; }
     catch { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); b.textContent = "Selecionado"; }
+    return;
+  }
+  if (b.dataset.tudo && db){
+    b.disabled = true;
+    try { await db.doc(`atribuicoes/${b.dataset.tudo}`).update({programacao:true, agenda:true, andamento:true}); }
+    catch(e){ b.disabled = false; aviso("Não consegui atualizar: "+(e.message||e.code), true); }
+    return;
+  }
+  if (b.dataset.excluir && db){
+    if (b.dataset.confirmar !== "1"){ b.dataset.confirmar = "1"; b.textContent = "Toque de novo para excluir (o prazo volta para a fila)"; return; }
+    b.disabled = true;
+    try { await db.doc(`atribuicoes/${b.dataset.excluir}`).delete(); }
+    catch(e){ b.disabled = false; aviso("Não consegui excluir: "+(e.message||e.code), true); }
     return;
   }
   if (b.dataset.id && db){
